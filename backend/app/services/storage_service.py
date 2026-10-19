@@ -301,3 +301,19 @@ def exists(key: str) -> bool:
 
 def content_type_for(key: str) -> str:
     return mimetypes.guess_type(key)[0] or "application/octet-stream"
+
+
+def delete_prefix(prefix: str) -> int:
+    if not get_settings().is_r2:
+        raise StorageError("delete_prefix is only supported for R2 storage.")
+    client = _s3_client()
+    bucket = _r2_bucket()
+    deleted = 0
+    paginator = client.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+        keys = [{"Key": item["Key"]} for item in page.get("Contents", [])]
+        if not keys:
+            continue
+        client.delete_objects(Bucket=bucket, Delete={"Objects": keys})
+        deleted += len(keys)
+    return deleted

@@ -195,6 +195,65 @@ If a seed was partially created and you want to start clean:
 
 Do not delete the Supabase project or the R2 bucket unless you intend to lose all data.
 
+### 5b. Migrate the exact local cases (optional)
+
+The startup seed recreates the synthetic content with new case IDs. To copy the exact current
+local cases into Supabase and R2 instead, use the migration script.
+
+1. Create the cloud credential file. It is gitignored:
+
+   ```bash
+   cp backend/.env.example backend/.env.cloud
+   ```
+
+2. Put the cloud values in `backend/.env.cloud`:
+
+   ```text
+   RED_THREAD_DATABASE_URL="postgresql://postgres.smtjnyniedtorzwghqpk:<password>@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres?sslmode=require"
+   RED_THREAD_STORAGE_BACKEND=r2
+   R2_ACCOUNT_ID=<cloudflare-account-id>
+   R2_ACCESS_KEY_ID=<r2-access-key-id>
+   R2_SECRET_ACCESS_KEY=<r2-secret-access-key>
+   R2_BUCKET=red-thread-evidence
+   ```
+
+   Leave `R2_ENDPOINT` unset for Cloudflare; the app derives
+   `https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com`. The password is the Supabase
+   database password, not the anon/service-role key. Do not commit this file.
+
+3. Run the migration from the project root:
+
+   ```bash
+   backend/.venv/bin/python scripts/migrate_local_to_cloud.py \
+     --env-file backend/.env.cloud --replace
+   ```
+
+   `--replace` removes remote cases with the same demo titles and their R2 prefixes before
+   copying. It never removes unrelated cases. Use it when the Render seed has already run;
+   without it, the script aborts if those titles already exist.
+
+4. What the script does:
+   - Copies all records in `data/red-thread.db`: cases, evidence metadata, events, entities,
+     event links, findings, finding links, graph edges, audit events and AI queries.
+   - Uploads the local evidence bytes to R2 under `evidence/<case_id>/<filename>`.
+   - Generates fresh Red Thread PDF and JSON reports from the migrated data. Old local report
+     files are not uploaded.
+   - Preserves the exact local case IDs `78bb46f55b3c4e8c96c6ed972f6db583` and
+     `87c31261e9524693b5cad74ebca19394`.
+
+   The verified local counts are 2 cases, 8 evidence files, 72 events, 21 findings, 10 AI
+   queries, 41 audit events and 60 graph edges. The migration generates 4 new reports.
+
+5. To make the local backend use Supabase/R2 instead of SQLite/local files, put the same
+   variables in `backend/.env` and restart the backend. Keep `backend/.env.cloud` only for the
+   one-time migration if you want local development to stay on SQLite.
+
+6. The Render service can keep `RED_THREAD_SEED_DEMO=true`. The seed is idempotent by case
+   title and will skip the migrated cases.
+
+The migration does not copy the local SQLite file itself, local venvs, or the old local report
+PDFs. The local database and evidence remain as a backup.
+
 ## 6. Access gate
 
 `RED_THREAD_API_TOKEN` is a shared demo access code, not a multi-user account system.
@@ -254,14 +313,15 @@ In the browser:
 
 ## 9. What is and is not migrated
 
-- **Migrated by seed:** the same synthetic PhishTrace and benign-control evidence content,
-  deterministic events, findings, entities, relationships and reports generated after deployment.
-- **Not migrated:** the exact local case IDs (`78bb…`, `87c…`), the local SQLite database,
-  the local audit/AI-query history, and the existing local report files.
-- The local `data/` and `reports/` directories are gitignored and are not part of the Docker
-  image. The deployed demo starts from `sample_data/`.
-- If you need an exact snapshot later, add a one-off import script that writes to Supabase and
-  R2; do not put SQLite on R2.
+- **Migrated by the startup seed:** the same synthetic PhishTrace and benign-control evidence
+  content, deterministic events, findings, entities, relationships and reports generated after
+  deployment. It uses new case IDs.
+- **Exact local snapshot:** use the migration script in 5b. It copies the exact local case IDs,
+  records, audit/AI-query history and evidence, and regenerates Red Thread reports.
+- **Not copied by the migration:** the SQLite file itself, local venvs, and old local report
+  files. The local `data/` and `reports/` directories are gitignored and are not part of the
+  Docker image.
+- Never put SQLite on R2; the migration writes rows to Supabase and objects to R2.
 
 ## 10. Security and privacy
 
