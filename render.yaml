@@ -1,0 +1,50 @@
+services:
+  - type: web
+    name: red-thread-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: RED_THREAD_ENVIRONMENT
+        value: production
+      - key: RED_THREAD_STORAGE_BACKEND
+        value: r2
+      - key: RED_THREAD_SEED_DEMO
+        value: "true"
+      - key: RED_THREAD_AI_PROVIDER
+        value: auto
+      - key: RED_THREAD_AI_MAX_TOKENS
+        value: "16384"
+      - key: RED_THREAD_AI_MAX_CONTEXT_CHARS
+        value: "60000"
+      - key: RED_THREAD_AI_TIMEOUT_SECONDS
+        value: "60"
+      - key: RED_THREAD_AI_REDACT_PII
+        value: "true"
+      - key: RED_THREAD_DEFAULT_TIMEZONE
+        value: Asia/Kolkata
+      - key: RED_THREAD_AUTH_DEFAULT_TIMEZONE
+        value: UTC
+      - key: RED_THREAD_ENABLE_LIVE_MONITOR
+        value: "false"
+      - key: RED_THREAD_MAX_UPLOAD_MB
+        value: "50"
+      - key: RED_THREAD_DATABASE_URL
+        sync: false
+      - key: RED_THREAD_API_TOKEN
+        sync: false
+      - key: RED_THREAD_CORS_ORIGINS
+        sync: false
+      - key: TOKENHARBOR_API_KEY
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
