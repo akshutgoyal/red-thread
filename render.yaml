@@ -34,8 +34,6 @@ services:
         value: "50"
       - key: RED_THREAD_DATABASE_URL
         sync: false
-      - key: RED_THREAD_API_TOKEN
-        sync: false
       - key: RED_THREAD_CORS_ORIGINS
         sync: false
       - key: TOKENHARBOR_API_KEY

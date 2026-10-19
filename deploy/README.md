@@ -107,8 +107,7 @@ The repository includes `Dockerfile`, `.dockerignore` and `render.yaml`.
 | `RED_THREAD_STORAGE_BACKEND` | `r2` |
 | `RED_THREAD_SEED_DEMO` | `true` |
 | `RED_THREAD_DATABASE_URL` | Supabase session-pooler URI with `?sslmode=require` |
-| `RED_THREAD_API_TOKEN` | Long random access code, e.g. `openssl rand -hex 24` |
-| `RED_THREAD_CORS_ORIGINS` | Exact Vercel origin, e.g. `https://red-thread.vercel.app` |
+| `RED_THREAD_CORS_ORIGINS` | Exact Vercel origin, e.g. `https://red-thread-virid.vercel.app` (trailing slash is normalized) |
 | `TOKENHARBOR_API_KEY` | Your TokenHarbor key (or set `COMMANDCODE_API_KEY`) |
 | `R2_ACCOUNT_ID` | Cloudflare account ID |
 | `R2_ACCESS_KEY_ID` | R2 API token access key |
@@ -139,7 +138,6 @@ Render. The container runs as a non-root user and listens on Render’s `$PORT`.
    | Variable | Value |
    |---|---|
    | `VITE_API_BASE_URL` | `https://<your-render-service>.onrender.com/api` |
-   | `VITE_REQUIRE_ACCESS_TOKEN` | `true` |
 
    No trailing slash is required; the client normalizes it.
 5. Deploy.
@@ -255,18 +253,15 @@ local cases into Supabase and R2 instead, use the migration script.
 The migration does not copy the local SQLite file itself, local venvs, or the old local report
 PDFs. The local database and evidence remain as a backup.
 
-## 6. Access gate
+## 6. Public access
 
-`RED_THREAD_API_TOKEN` is a shared demo access code, not a multi-user account system.
+The deployed demo has **no login, access code or user authentication**. The frontend, API,
+evidence, reports, audit data and AI endpoints are public. Use synthetic evidence only and never
+upload sensitive or real case material to a public URL.
 
-- The Vercel site shows an access screen when `VITE_REQUIRE_ACCESS_TOKEN=true`.
-- The browser stores the code in `sessionStorage` and sends it as `X-API-Key`.
-- The lock button in the top bar clears the code and reloads the gate.
-- Direct evidence/report/auth-export links include the code as an `access_token` query
-  parameter because `<img>`, `<iframe>` and download links cannot send custom headers.
-- The static frontend is public, but all case data, evidence, reports, audit data and AI
-  endpoints require the code.
-- Share the code only with reviewers. Do not reuse it as a real account password.
+CORS is controlled by `RED_THREAD_CORS_ORIGINS`. Trailing slashes are normalized, so
+`https://red-thread-virid.vercel.app/` is treated as
+`https://red-thread-virid.vercel.app`. Use the exact origin with no path.
 
 ## 7. Verification
 
@@ -274,24 +269,18 @@ PDFs. The local database and evidence remain as a backup.
 # Health should report database=ok, ocr_available=true, and the configured AI provider.
 curl -s https://<render-service>.onrender.com/api/health
 
-# This should return 401 without the code.
-curl -s -o /dev/null -w '%{http_code}\n' \
-  https://<render-service>.onrender.com/api/cases
-
-# This should return the two synthetic cases.
-curl -s -H "X-API-Key: <access-code>" \
-  https://<render-service>.onrender.com/api/cases
+# This should return the two cases without any authentication header.
+curl -s https://<render-service>.onrender.com/api/cases
 ```
 
 In the browser:
 
 1. Open the Vercel URL.
-2. Enter the access code. Wrong codes are rejected.
-3. Confirm the active case is **Operation PhishTrace (Synthetic Demo)**.
-4. Open **Evidence vault**, open `payment_screenshot.png`, and confirm the preview loads.
-5. Run **Verify** on an evidence row and confirm the SHA-256 matches.
-6. Open **Reports**, generate JSON or PDF, and download it.
-7. Open **AI assistant** and ask a grounded question such as:
+2. Confirm the active case is **Operation PhishTrace (Synthetic Demo)**.
+3. Open **Evidence vault**, open `payment_screenshot.png`, and confirm the preview loads.
+4. Run **Verify** on an evidence row and confirm the SHA-256 matches.
+5. Open **Reports**, generate JSON or PDF, and download it.
+6. Open **AI assistant** and ask a grounded question such as:
    “Which evidence supports the amount discrepancy, and what are the limitations?”
    The first request may be slow on the free tier. A response with validated citations is
    AI-generated interpretation, not proof.
@@ -304,13 +293,12 @@ In the browser:
 | `database=error` | Supabase project paused or unreachable; use the Session pooler URI and `sslmode=require`; wake the project. |
 | No cases after startup | `RED_THREAD_SEED_DEMO=true`; Render logs for `Demo seed result`; Supabase and R2 permissions. |
 | Seed fails on OCR or memory | Render Free has 512 MB. Retry after the deploy settles; if it consistently fails, use a larger Render instance or pre-seed from a machine with the same Supabase/R2 configuration. |
-| Evidence preview 401 | You opened a direct URL without `access_token`; use the app or include the code. |
-| CORS error | `RED_THREAD_CORS_ORIGINS` must exactly match the browser origin, no trailing slash; restart Render after changing it. |
+| CORS error | `RED_THREAD_CORS_ORIGINS` must contain the exact browser origin; trailing slashes are normalized. Restart Render after changing it. Check the `OPTIONS` preflight returns `access-control-allow-origin`. |
 | AI disabled | Set `TOKENHARBOR_API_KEY` or `COMMANDCODE_API_KEY`; check `/api/ai/status` and the AI page banner. |
 | AI empty/truncated answer | Keep `RED_THREAD_AI_MAX_TOKENS=16384`; lower `RED_THREAD_AI_MAX_CONTEXT_CHARS` if the provider limit is smaller. |
 | Supabase free project paused | Unpause it in the Supabase dashboard; the first request may fail until it wakes. |
 | R2 `AccessDenied` | The token must have Object Read & Write on the exact bucket; verify account ID, key, secret and bucket name. |
-| First request takes ~1 minute | Render Free slept after inactivity. The gate shows a waking message; retry if the request fails. |
+| First request takes ~1 minute | Render Free slept after inactivity. Retry if the first request fails. |
 
 ## 9. What is and is not migrated
 
@@ -329,8 +317,8 @@ In the browser:
 - Keep `TOKENHARBOR_API_KEY` / `COMMANDCODE_API_KEY` in Render’s secret store only.
 - Never commit `.env`; the repository only contains `.env.example`.
 - Keep the R2 bucket private.
-- The access code is a shared gate, not full authentication. Do not upload real or sensitive
-  evidence to a public demo URL.
+- The deployed demo has no authentication. Do not upload real or sensitive evidence to the
+  public demo URL.
 - AI requests send selected case excerpts to the configured provider. Review the provider’s
   data-handling terms before using confidential material.
 - Reports are marked draft-only for human review and are not automatically court-admissible.

@@ -10,7 +10,6 @@ TEST_ROOT = Path(tempfile.mkdtemp(prefix="red-thread_test_"))
 os.environ["RED_THREAD_DATA_DIR"] = str(TEST_ROOT / "data")
 os.environ["RED_THREAD_REPORTS_DIR"] = str(TEST_ROOT / "reports")
 os.environ["RED_THREAD_DATABASE_URL"] = f"sqlite:///{TEST_ROOT / 'test.db'}"
-os.environ["RED_THREAD_API_TOKEN"] = ""
 os.environ["RED_THREAD_AUTH_DEFAULT_YEAR"] = "2026"
 os.environ["RED_THREAD_AUTH_DEFAULT_TIMEZONE"] = "UTC"
 os.environ["RED_THREAD_ENABLE_LIVE_MONITOR"] = "false"

@@ -71,9 +71,9 @@
 - There is no full multi-user identity, role, or permission system.
 - Case-scoped API checks prevent cross-case access through the documented routes, but anyone
   with local filesystem access can read the SQLite database and evidence directory.
-- `RED_THREAD_API_TOKEN` is a simple optional bearer gate, not a complete authentication system.
-- For multi-user or network deployment, add proper identity, TLS, authorization, backups, and
-  storage encryption.
+- The deployed demo has no login or authentication. Its API, evidence, reports and AI endpoints
+  are public; use synthetic data only. Add proper identity, authorization, rate limiting, backups
+  and storage encryption before handling real case material.
 
 ## Demo data
 

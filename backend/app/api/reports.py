@@ -5,11 +5,11 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..dependencies import get_case_or_404, require_api_token, require_case_id
+from ..dependencies import get_case_or_404, require_case_id
 from ..schemas.report import ReportCreate, ReportRead
 from ..services import report_service, storage_service
 
-router = APIRouter(tags=["reports"], dependencies=[Depends(require_api_token)])
+router = APIRouter(tags=["reports"])
 
 
 @router.post("/cases/{case_id}/reports", response_model=ReportRead, status_code=201)

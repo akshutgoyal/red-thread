@@ -9,7 +9,7 @@ generates traceable reports. AI assistance is optional and evidence-grounded; th
 pipeline works without it.
 
 > **Status:** Working end-to-end implementation with a synthetic demonstration case. Backend:
-> 77 automated tests passing. Frontend: production build and lint passing. AI integration includes
+> 78 automated tests passing. Frontend: production build and lint passing. AI integration includes
 > mocked failure tests and a live DeepSeek V4.1 Flash verification via TokenHarbor with validated
 > citations. A managed deployment path (Vercel + Render + Supabase + Cloudflare R2) is included.
 
@@ -144,15 +144,15 @@ red-thread/
 │   │   │                            call/chat/transaction/invoice/email/
 │   │   │                            image/generic parsers
 │   │   └── utils/                   timestamps, amounts, identifiers
-│   ├── tests/                       77 backend tests
+│   ├── tests/                       78 backend tests
 │   ├── requirements.txt             runtime dependencies
 │   ├── requirements-dev.txt         test dependencies
 │   ├── requirements-ocr.txt         optional OCR dependencies
 │   └── .env.example
 ├── frontend/
 │   ├── src/
-│   │   ├── api/                     typed API client, access-token handling
-│   │   ├── components/              UI, layout, access gate
+│   │   ├── api/                     typed API client
+│   │   ├── components/              UI, layout, charts
 │   │   ├── context/                 active-case context
 │   │   ├── hooks/                   TanStack Query hooks
 │   │   ├── lib/                     formatting, severity and class helpers
@@ -257,7 +257,7 @@ AI.
 
 ```bash
 cd backend
-.venv/bin/pytest -q           # 77 passed
+.venv/bin/pytest -q           # 78 passed
 cd ../frontend
 npm run build                 # TypeScript + Vite production build
 ```
@@ -374,10 +374,9 @@ same PhishTrace and benign-control content with new case IDs. For the exact loca
 use `scripts/migrate_local_to_cloud.py` (see `deploy/README.md`, section 5b); it copies the
 local case IDs, records, audit/AI-query history and evidence, and regenerates Red Thread reports.
 
-The shared access gate is `RED_THREAD_API_TOKEN`; set `VITE_REQUIRE_ACCESS_TOKEN=true` on Vercel.
-The static frontend is public, but the API, evidence, reports and AI endpoints require the
-code. Evidence/report/auth-export links include the code as `access_token` because direct
-`<img>`, `<iframe>` and download requests cannot send custom headers.
+The deployed demo is public: there is no login or access gate. The API, evidence, reports and
+AI endpoints are public, so use synthetic evidence only. CORS is controlled by the comma-separated
+`RED_THREAD_CORS_ORIGINS` allowlist; trailing slashes are normalized.
 
 The deployed API is stateless: Render’s disk is ephemeral; Supabase and R2 retain data across
 restarts. Render Free has 512 MB RAM and cold starts, and Supabase Free projects may pause
@@ -405,8 +404,7 @@ Copy `backend/.env.example` to `backend/.env` (or the project-root `.env`). Neve
 | `RED_THREAD_SEED_DEMO` | `false` | Idempotently create the two synthetic demo cases on startup |
 | `RED_THREAD_SAMPLE_DATA_DIR` | `<project>/sample_data` | Seed source directory |
 | `RED_THREAD_MAX_UPLOAD_MB` | `50` | Per-file upload limit |
-| `RED_THREAD_CORS_ORIGINS` | localhost dev origins | Allowed frontend origins |
-| `RED_THREAD_API_TOKEN` | empty | Shared access code; accepted as Bearer, `X-API-Key`, or `access_token` for file links |
+| `RED_THREAD_CORS_ORIGINS` | localhost dev origins | Comma-separated allowed frontend origins; trailing slashes are normalized |
 | `RED_THREAD_AUTH_DEFAULT_TIMEZONE` | `UTC` | Timezone assumed for syslog auth lines |
 | `RED_THREAD_DEFAULT_TIMEZONE` | `Asia/Kolkata` | Default for financial/call/chat evidence |
 | `RED_THREAD_AUTH_DEFAULT_YEAR` | unset | Fixed year for syslog lines; blank infers from case date |
@@ -494,8 +492,8 @@ external provider. API keys never reach the browser and are never included in re
 | GET | `/api/reports/{report_id}/download?case_id=` | Download report |
 
 Case-scoped routes validate that the case exists. Evidence/report/finding routes require the
-selected `case_id` (query parameter or `X-Case-ID` header) and reject cross-case access. Set
-`RED_THREAD_API_TOKEN` to require a bearer token on API requests in non-local deployments.
+selected `case_id` (query parameter or `X-Case-ID` header) and reject cross-case access. The
+deployed API is public; there is no user authentication or access token.
 
 ---
 
@@ -596,9 +594,8 @@ Red Thread never fabricates a signature or attests on behalf of an investigator.
 - File size, extension and empty-file validation are enforced.
 - SHA-256 verification proves stored-file correspondence, not pre-acquisition authenticity.
 - Case-scoped access checks prevent cross-case evidence/report access through the API.
-- `RED_THREAD_API_TOKEN` adds a shared access gate for non-local use. It is accepted as a Bearer
-  token, `X-API-Key`, or `access_token` query on file downloads. The static frontend is public;
-  the API and case data are not.
+- The deployed demo has no authentication gate. The API, case data, evidence, reports and AI
+  endpoints are public; use synthetic evidence only and do not upload sensitive material.
 - In deployed mode, R2 stays private and evidence/report bytes are streamed by the API; Supabase
   stores metadata. Secrets stay in Render’s environment, never in the frontend or repository.
 - AI keys stay in backend environment variables and are never returned by the API.
@@ -617,19 +614,17 @@ See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) for the full limitation list.
 
 At the time of writing:
 
-- **Backend:** `77 passed` with `pytest -q`.
+- **Backend:** `78 passed` with `pytest -q`.
 - **Frontend:** `npm run build` completed successfully (TypeScript + Vite).
 - **Frontend lint:** `npm run lint` completed with 0 errors and 0 warnings.
 - The Vite production build is split into React, query, Cytoscape and Recharts vendor chunks.
 - **Storage tests:** local round-trip, path-traversal rejection, and an R2 adapter round-trip
-  using a fake S3 client. Live R2 credentials were not available in this workspace.
+  using a fake S3 client. The live R2 path is verified by the cloud migration below.
 - **Deployment-path verification:** a fresh SQLite/local-storage run with
   `RED_THREAD_SEED_DEMO=true` recreated the two cases (Operation PhishTrace: 6 evidence, 69 events,
-  17 findings; Benign Control: 2 evidence, 3 events, 4 findings). The API returned 401 without
-  the access code, 200 with the `X-API-Key` header and with the `access_token` query, and
-  streamed evidence and report downloads worked. The browser gate rejected a wrong code,
-  unlocked with the valid code, loaded the screenshot preview through the gated URL, and
-  generated a report with a tokenized download URL.
+  17 findings; Benign Control: 2 evidence, 3 events, 4 findings). The public API listed the
+  cases, and streamed evidence and report downloads worked. The browser loaded the screenshot
+  preview and generated a report through the public API.
 - **Docker verification:** the Render image built successfully and ran as the non-root `red-thread`
   user. Health reported `database=ok` and `ocr_available=true`; the startup seed produced the same
   two cases and counts inside the container.
@@ -689,10 +684,8 @@ npm run build
 - Live monitoring is optional, disabled by default, and restricted to an explicitly configured
   source.
 - The generated demo data is synthetic and must not be presented as real evidence.
-- In deployed mode, `RED_THREAD_API_TOKEN` is a shared demo gate, not a multi-user identity system.
-  The static frontend is public; the API, evidence, reports and AI endpoints are protected.
-- File/report/auth-export links carry the access code in the query string because direct
-  browser previews and downloads cannot send custom headers. Do not share those URLs.
+- The deployed demo has no user authentication. The frontend, API, evidence, reports and AI
+  endpoints are public; use synthetic data only. Do not upload sensitive material.
 - Render Free sleeps after inactivity and has 512 MB RAM; Supabase Free projects can pause.
   Open the deployment before a demo and expect a cold-start delay.
 - The startup seed recreates the same synthetic case content with new case IDs. Use the

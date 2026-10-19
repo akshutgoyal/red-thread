@@ -4,6 +4,21 @@ from pydantic import ValidationError
 from app.config import PROJECT_ROOT, Settings
 
 
+def test_cors_origins_strip_trailing_slashes():
+    settings = Settings(
+        _env_file=None,
+        cors_origins=(
+            "https://red-thread-virid.vercel.app/, "
+            "http://localhost:5173/"
+        ),
+    )
+
+    assert settings.cors_origin_list == [
+        "https://red-thread-virid.vercel.app",
+        "http://localhost:5173",
+    ]
+
+
 def test_blank_path_settings_use_project_defaults(monkeypatch):
     monkeypatch.setenv("RED_THREAD_DATA_DIR", "")
     monkeypatch.setenv("RED_THREAD_REPORTS_DIR", "")

@@ -4,15 +4,11 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..dependencies import get_case_or_404, require_api_token
+from ..dependencies import get_case_or_404
 from ..schemas.case import CaseCreate, CaseRead, CaseSummary, CaseUpdate
 from ..services import audit_service, case_service
 
-router = APIRouter(
-    prefix="/cases",
-    tags=["cases"],
-    dependencies=[Depends(require_api_token)],
-)
+router = APIRouter(prefix="/cases", tags=["cases"])
 
 
 @router.post("", response_model=CaseRead, status_code=status.HTTP_201_CREATED)

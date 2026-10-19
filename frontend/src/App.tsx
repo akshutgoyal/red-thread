@@ -6,7 +6,6 @@ import {
   Routes,
   useParams,
 } from "react-router-dom";
-import { AccessGate } from "@/components/auth/AccessGate";
 import { CaseProvider, useCaseContext } from "@/context/CaseContext";
 import { AppShell } from "@/components/layout/AppShell";
 import { DashboardPage } from "@/pages/DashboardPage";
@@ -34,29 +33,27 @@ function CaseRouteLayout() {
 
 export function App() {
   return (
-    <AccessGate>
-      <BrowserRouter>
-        <CaseProvider>
-          <Routes>
-            <Route element={<AppShell />}>
-              <Route index element={<DashboardPage />} />
-              <Route path="cases" element={<CasesPage />} />
-              <Route path="cases/:caseId" element={<CaseRouteLayout />}>
-                <Route index element={<CaseOverviewPage />} />
-                <Route path="evidence" element={<EvidenceVaultPage />} />
-                <Route path="evidence/intake" element={<EvidenceIntakePage />} />
-                <Route path="auth" element={<AuthAnalysisPage />} />
-                <Route path="timeline" element={<TimelinePage />} />
-                <Route path="graph" element={<GraphPage />} />
-                <Route path="findings" element={<FindingsPage />} />
-                <Route path="ai" element={<AiAssistantPage />} />
-                <Route path="reports" element={<ReportsPage />} />
-              </Route>
-              <Route path="*" element={<DashboardPage />} />
+    <BrowserRouter>
+      <CaseProvider>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="cases" element={<CasesPage />} />
+            <Route path="cases/:caseId" element={<CaseRouteLayout />}>
+              <Route index element={<CaseOverviewPage />} />
+              <Route path="evidence" element={<EvidenceVaultPage />} />
+              <Route path="evidence/intake" element={<EvidenceIntakePage />} />
+              <Route path="auth" element={<AuthAnalysisPage />} />
+              <Route path="timeline" element={<TimelinePage />} />
+              <Route path="graph" element={<GraphPage />} />
+              <Route path="findings" element={<FindingsPage />} />
+              <Route path="ai" element={<AiAssistantPage />} />
+              <Route path="reports" element={<ReportsPage />} />
             </Route>
-          </Routes>
-        </CaseProvider>
-      </BrowserRouter>
-    </AccessGate>
+            <Route path="*" element={<DashboardPage />} />
+          </Route>
+        </Routes>
+      </CaseProvider>
+    </BrowserRouter>
   );
 }

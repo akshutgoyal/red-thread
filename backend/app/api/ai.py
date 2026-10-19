@@ -5,11 +5,11 @@ from sqlalchemy.orm import Session
 
 from ..config import Settings, get_settings
 from ..database import get_db
-from ..dependencies import get_case_or_404, require_api_token
+from ..dependencies import get_case_or_404
 from ..schemas.ai import AiAnswerResponse, AiAskRequest, AiStatusResponse
 from ..services import ai_service
 
-router = APIRouter(tags=["ai"], dependencies=[Depends(require_api_token)])
+router = APIRouter(tags=["ai"])
 
 
 @router.get("/ai/status", response_model=AiStatusResponse)

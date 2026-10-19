@@ -146,7 +146,7 @@ their R2 prefixes; see [deploy/README.md](../deploy/README.md).
 - `evidence_service.get_evidence_path` resolves paths and rejects anything outside the evidence
   root.
 - Evidence, finding and report routes validate case ownership.
-- Optional `RED_THREAD_API_TOKEN` requires a bearer token or `X-API-Key`.
+- The deployed API is public; `RED_THREAD_CORS_ORIGINS` controls which browser origins may call it.
 - AI keys remain backend-only.
 - Reports expose relative identifiers, never arbitrary server paths.
 

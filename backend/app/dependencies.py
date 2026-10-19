@@ -1,34 +1,11 @@
 from __future__ import annotations
 
-from fastapi import Depends, Header, HTTPException, Query, status
+from fastapi import Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from .config import get_settings
 from .database import get_db
 from .models import Case, Evidence
 from .services import case_service, evidence_service
-
-
-def require_api_token(
-    authorization: str | None = Header(default=None),
-    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
-    access_token: str | None = Query(default=None, include_in_schema=False),
-) -> None:
-    settings = get_settings()
-    if not settings.api_token:
-        return
-    token: str | None = None
-    if authorization and authorization.lower().startswith("bearer "):
-        token = authorization[7:].strip()
-    elif x_api_key:
-        token = x_api_key.strip()
-    elif access_token:
-        token = access_token.strip()
-    if token != settings.api_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or missing API token.",
-        )
 
 
 def require_case_id(

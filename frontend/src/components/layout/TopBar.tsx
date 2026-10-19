@@ -1,10 +1,5 @@
-import { Lock, Menu, Plus } from "lucide-react";
+import { Menu, Plus } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import {
-  accessGateRequired,
-  clearAccessToken,
-  getAccessToken,
-} from "@/api/client";
 import { useCaseContext } from "@/context/CaseContext";
 import { useAiStatus } from "@/hooks/useApi";
 import { Badge } from "@/components/ui/Badge";
@@ -72,20 +67,6 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
         >
           {aiStatus?.configured ? aiStatus.model_label ?? aiStatus.model : "AI disabled"}
         </Badge>
-        {accessGateRequired() && getAccessToken() ? (
-          <button
-            type="button"
-            onClick={() => {
-              clearAccessToken();
-              window.location.reload();
-            }}
-            className="rounded-lg p-2 text-secondary transition-colors hover:bg-surface-2 hover:text-primary"
-            aria-label="Lock demo access"
-            title="Lock demo access"
-          >
-            <Lock size={16} />
-          </button>
-        ) : null}
         <ThemeToggle />
         <Link to="/cases" className="hidden sm:block">
           <Button size="sm" variant="primary" icon={<Plus size={14} />}>

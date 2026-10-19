@@ -14,7 +14,6 @@ from ..database import get_db
 from ..dependencies import (
     get_case_or_404,
     get_evidence_or_404,
-    require_api_token,
     require_case_id,
 )
 from ..models import AuditEvent, Entity, Event, EventEntity, Evidence, Finding, FindingEvidence
@@ -37,7 +36,7 @@ from ..services import (
     storage_service,
 )
 
-router = APIRouter(tags=["evidence"], dependencies=[Depends(require_api_token)])
+router = APIRouter(tags=["evidence"])
 
 EVENT_EXPORT_FIELDS = [
     "event_id",

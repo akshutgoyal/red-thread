@@ -28,7 +28,6 @@ class Settings(BaseSettings):
     database_url: str | None = None
     max_upload_mb: int = 50
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
-    api_token: str | None = None
     enable_live_monitor: bool = False
     seed_demo: bool = False
 
@@ -175,7 +174,12 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        origins: list[str] = []
+        for raw in self.cors_origins.split(","):
+            origin = raw.strip().rstrip("/")
+            if origin:
+                origins.append(origin)
+        return origins
 
     @property
     def max_upload_bytes(self) -> int:

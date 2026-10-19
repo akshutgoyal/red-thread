@@ -20,44 +20,6 @@ export const API_BASE = (
   import.meta.env.VITE_API_BASE_URL ?? "/api"
 ).replace(/\/+$/, "");
 
-const ACCESS_TOKEN_KEY = "red-thread.accessToken";
-
-export function accessGateRequired(): boolean {
-  return import.meta.env.VITE_REQUIRE_ACCESS_TOKEN === "true";
-}
-
-export function getAccessToken(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.sessionStorage.getItem(ACCESS_TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function setAccessToken(token: string): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
-  } catch {
-    // Session storage may be unavailable in private modes.
-  }
-}
-
-export function clearAccessToken(): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-  } catch {
-    // Ignore storage failures.
-  }
-}
-
-function accessTokenParams(): Record<string, string> {
-  const token = getAccessToken();
-  return token ? { access_token: token } : {};
-}
-
 export class ApiError extends Error {
   status: number;
   detail: unknown;
@@ -80,8 +42,6 @@ interface RequestOptions {
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = { ...(options.headers ?? {}) };
   if (options.caseId) headers["X-Case-ID"] = options.caseId;
-  const token = getAccessToken();
-  if (token) headers["X-API-Key"] = token;
 
   let body: BodyInit | undefined;
   if (options.body instanceof FormData) {
@@ -170,10 +130,7 @@ export const api = {
       { caseId },
     ),
   getEvidenceContentUrl: (caseId: string, evidenceId: string) =>
-    `${API_BASE}/evidence/${evidenceId}/content${query({
-      case_id: caseId,
-      ...accessTokenParams(),
-    })}`,
+    `${API_BASE}/evidence/${evidenceId}/content${query({ case_id: caseId })}`,
 
   listEvents: (
     caseId: string,
@@ -223,10 +180,7 @@ export const api = {
 
   audit: (caseId: string) => request<AuditEvent[]>(`/cases/${caseId}/audit`, { caseId }),
   getAuthExportUrl: (caseId: string, format: "json" | "csv") =>
-    `${API_BASE}/cases/${caseId}/auth/export${query({
-      format,
-      ...accessTokenParams(),
-    })}`,
+    `${API_BASE}/cases/${caseId}/auth/export${query({ format })}`,
 
   aiStatus: () => request<AiStatus>("/ai/status"),
   askAi: (caseId: string, question: string) =>
@@ -244,8 +198,5 @@ export const api = {
       body: { report_type: reportType },
     }),
   getReportDownloadUrl: (caseId: string, reportId: string) =>
-    `${API_BASE}/reports/${reportId}/download${query({
-      case_id: caseId,
-      ...accessTokenParams(),
-    })}`,
+    `${API_BASE}/reports/${reportId}/download${query({ case_id: caseId })}`,
 };
