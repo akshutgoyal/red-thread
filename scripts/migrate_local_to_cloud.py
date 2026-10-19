@@ -48,7 +48,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--replace",
         action="store_true",
-        help="Delete remote cases with the same titles and their R2 prefixes before copying.",
+        help="Delete remote seed cases with the same titles but different IDs, plus their R2 prefixes. Existing local-ID cases are resumed.",
     )
     return parser.parse_args()
 
@@ -82,6 +82,7 @@ def main() -> int:
         Finding,
         FindingEvidence,
         GraphEdge,
+        Report,
     )
     from app.services import report_service, storage_service
 
@@ -144,9 +145,14 @@ def main() -> int:
             raise SystemExit("The local database contains no cases.")
 
         local_titles = [case.title for case in local_cases]
-        conflicts = list(
-            remote.scalars(select(Case).where(Case.title.in_(local_titles)))
-        )
+        local_case_ids = {case.id for case in local_cases}
+        conflicts = [
+            case
+            for case in remote.scalars(
+                select(Case).where(Case.title.in_(local_titles))
+            )
+            if case.id not in local_case_ids
+        ]
         if conflicts and not args.replace:
             raise SystemExit(
                 "Remote cases with the same demo titles already exist. "
@@ -180,6 +186,12 @@ def main() -> int:
         counts: dict[str, int] = {}
 
         for model in copy_order:
+            local_total = local.query(model).count()
+            remote_total = remote.query(model).count()
+            if local_total == remote_total:
+                counts[model.__name__] = remote_total
+                print(f"  {model.__name__}: already present ({remote_total})")
+                continue
             rows = list(local.scalars(select(model)))
             for row in rows:
                 values = {
@@ -217,12 +229,20 @@ def main() -> int:
             counts[model.__name__] = len(rows)
             print(f"  {model.__name__}: {len(rows)}")
 
-        local_case_ids = [case.id for case in local_cases]
         migrated_cases = list(
             remote.scalars(select(Case).where(Case.id.in_(local_case_ids)))
         )
         for case in migrated_cases:
             for report_type in ("pdf", "json"):
+                existing = remote.query(Report).filter(
+                    Report.case_id == case.id,
+                    Report.report_type == report_type,
+                ).first()
+                if existing:
+                    print(
+                        f"  Report already present: {case.id} {report_type}"
+                    )
+                    continue
                 report_service.generate_report(remote, case.id, report_type)
                 reports_generated += 1
     finally:

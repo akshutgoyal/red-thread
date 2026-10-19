@@ -636,15 +636,16 @@ At the time of writing:
 - **Postgres verification:** a temporary PostgreSQL 16 instance created the schema, seeded both
   cases (Operation PhishTrace: 6/69/17; Benign Control: 2/3/4), generated a JSON report, and
   returned the same counts through the API.
-- **Migration verification:** copied the exact local SQLite cases into a temporary PostgreSQL 16
-  instance and a Moto S3-compatible bucket. Preserved the local IDs, 2 cases, 8 evidence files,
-  72 events, 21 findings, 10 AI queries, 41 audit events and 60 graph edges; uploaded 8 evidence
-  objects and generated 4 fresh Red Thread reports. Evidence hash verification and PDF/JSON
-  downloads through the API passed. `--replace` removed the previously seeded demo cases and
-  their objects without touching unrelated data.
-- **Not live-tested here:** the actual Supabase session-pooler connection and a real Cloudflare R2
-  bucket. The Postgres path and the S3-compatible storage path are verified against PostgreSQL 16
-  and Moto; the deployment guide includes the verification checklist for the real services.
+- **Migration verification:** the resumable script copied the exact local data into a temporary
+  PostgreSQL 16 + Moto S3 environment, then into the live Supabase project and real R2 bucket
+  through the session pooler. Live final state: the exact local IDs, 2 cases, 8 evidence files,
+  72 events, 21 findings, 10 AI queries, 45 audit events, 60 graph edges and 4 Red Thread
+  reports; 12 R2 objects (8 evidence + 4 reports). The previous seed cases and their objects
+  were removed. Render health reports `database=ok`, AI configured and OCR available.
+- **Remaining deployment config:** the Vercel frontend must use
+  `https://red-thread-api.onrender.com/api` as `VITE_API_BASE_URL`, and Render’s
+  `RED_THREAD_CORS_ORIGINS` must contain the exact Vercel production origin. See
+  [deploy/README.md](deploy/README.md).
 - **AI tests:** mocked provider success, invalid credentials, rate limits, retries, timeouts,
   malformed responses, empty responses, length-truncated reasoning, reasoning-only responses,
   citation validation (including combined and plural locators), insufficient evidence, and
@@ -697,11 +698,9 @@ npm run build
 - The startup seed recreates the same synthetic case content with new case IDs. Use the
   `scripts/migrate_local_to_cloud.py` migration for the exact local case IDs, audit/AI-query
   history and evidence; it regenerates reports rather than copying old local report files.
-- The Postgres path was verified against a local PostgreSQL 16 instance and the migration was
-  tested against PostgreSQL 16 plus a Moto S3-compatible bucket. The actual Supabase
-  session-pooler connection and a real Cloudflare R2 bucket were not live-tested in this
-  workspace. Use the verification checklist in [deploy/README.md](deploy/README.md) with real
-  credentials.
+- The live Supabase session-pooler and real Cloudflare R2 migration is verified. The Vercel
+  frontend still needs the Render API base with `/api` and the exact Vercel origin in Render’s
+  `RED_THREAD_CORS_ORIGINS`; see [deploy/README.md](deploy/README.md).
 
 ---
 

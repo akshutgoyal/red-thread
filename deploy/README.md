@@ -228,9 +228,10 @@ local cases into Supabase and R2 instead, use the migration script.
      --env-file backend/.env.cloud --replace
    ```
 
-   `--replace` removes remote cases with the same demo titles and their R2 prefixes before
-   copying. It never removes unrelated cases. Use it when the Render seed has already run;
-   without it, the script aborts if those titles already exist.
+   `--replace` removes remote seed cases with the same demo titles but different IDs, plus
+   their R2 prefixes. Cases that already have the local IDs are kept. The script skips tables
+   that are already fully copied, resumes missing tables, and generates only missing reports,
+   so it is safe to re-run after an interrupted migration. It never removes unrelated cases.
 
 4. What the script does:
    - Copies all records in `data/red-thread.db`: cases, evidence metadata, events, entities,
