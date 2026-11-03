@@ -5,6 +5,12 @@ from .event import Entity, Event, EventEntity
 from .evidence import Evidence
 from .finding import Finding, FindingEvidence
 from .graph import GraphEdge
+from .relationship import (
+    InvestigatorAnnotation,
+    Relationship,
+    RelationshipSupport,
+    ReviewDecision,
+)
 from .report import Report
 
 __all__ = [
@@ -18,5 +24,9 @@ __all__ = [
     "Finding",
     "FindingEvidence",
     "GraphEdge",
+    "InvestigatorAnnotation",
+    "Relationship",
+    "RelationshipSupport",
     "Report",
+    "ReviewDecision",
 ]

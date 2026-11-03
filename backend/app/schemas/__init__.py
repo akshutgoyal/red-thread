@@ -18,6 +18,16 @@ from .finding import (
     FindingRead,
     FindingReviewRequest,
 )
+from .relationship import (
+    AnnotationCreate,
+    AnnotationRead,
+    RelationshipDetail,
+    RelationshipListResponse,
+    RelationshipRead,
+    RelationshipReviewRequest,
+    RelationshipSupportRead,
+    ReviewDecisionRead,
+)
 from .report import ReportCreate, ReportRead
 
 __all__ = [
@@ -41,6 +51,8 @@ __all__ = [
     "FindingListResponse",
     "FindingRead",
     "FindingReviewRequest",
+    "AnnotationCreate",
+    "AnnotationRead",
     "GraphEdgeRead",
     "GraphNodeRead",
     "GraphResponse",
@@ -48,7 +60,13 @@ __all__ = [
     "HealthResponse",
     "MessageResponse",
     "ParseResponse",
+    "RelationshipDetail",
+    "RelationshipListResponse",
+    "RelationshipRead",
+    "RelationshipReviewRequest",
+    "RelationshipSupportRead",
     "ReportCreate",
     "ReportRead",
+    "ReviewDecisionRead",
     "TimelineResponse",
 ]
