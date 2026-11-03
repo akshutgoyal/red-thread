@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { CalendarClock, Search, ShieldQuestion } from "lucide-react";
 import { useEvidence, useTimeline } from "@/hooks/useApi";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -7,6 +7,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Drawer } from "@/components/ui/Drawer";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
+import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Field";
 import { formatDateTime, humanize } from "@/lib/format";
 import type { EventRecord } from "@/types";
@@ -20,11 +21,16 @@ const CONFIDENCE_CLASS: Record<string, string> = {
 
 export function TimelinePage() {
   const { caseId } = useParams<{ caseId: string }>();
+  const [searchParams] = useSearchParams();
+  const deepEventId = searchParams.get("event");
   const timelineQuery = useTimeline(caseId);
   const evidenceQuery = useEvidence(caseId);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [confidenceFilter, setConfidenceFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [selected, setSelected] = useState<EventRecord | null>(null);
 
   const evidenceNames = useMemo(() => {
@@ -44,10 +50,22 @@ export function TimelinePage() {
         const matchesType = typeFilter === "all" || event.event_type === typeFilter;
         const matchesConfidence =
           confidenceFilter === "all" || event.timestamp_confidence === confidenceFilter;
-        return matchesSearch && matchesType && matchesConfidence;
+        const matchesSource =
+          sourceFilter === "all" || event.evidence_id === sourceFilter;
+        const day = event.timestamp_normalized?.slice(0, 10) ?? "";
+        const matchesRange =
+          (!startDate || (day !== "" && day >= startDate)) &&
+          (!endDate || (day !== "" && day <= endDate));
+        return matchesSearch && matchesType && matchesConfidence && matchesSource && matchesRange;
       }),
-    [events, search, typeFilter, confidenceFilter],
+    [events, search, typeFilter, confidenceFilter, sourceFilter, startDate, endDate],
   );
+
+  useEffect(() => {
+    if (!deepEventId) return;
+    const match = events.find((event) => event.id === deepEventId);
+    if (match) setSelected(match);
+  }, [deepEventId, events]);
 
   const grouped = useMemo(() => {
     const groups = new Map<string, EventRecord[]>();
@@ -118,6 +136,32 @@ export function TimelinePage() {
               <option value="ambiguous">Ambiguous</option>
               <option value="unknown">Unknown</option>
             </Select>
+            <Select
+              value={sourceFilter}
+              onChange={(event) => setSourceFilter(event.target.value)}
+              className="w-48 text-xs"
+            >
+              <option value="all">All evidence sources</option>
+              {(evidenceQuery.data ?? []).map((evidence) => (
+                <option key={evidence.id} value={evidence.id}>
+                  {evidence.original_filename}
+                </option>
+              ))}
+            </Select>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(event) => setStartDate(event.target.value)}
+              className="w-36 text-xs"
+              aria-label="Start date"
+            />
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(event) => setEndDate(event.target.value)}
+              className="w-36 text-xs"
+              aria-label="End date"
+            />
           </div>
         }
       />
@@ -292,6 +336,40 @@ export function TimelinePage() {
                 ))}
               </div>
             ) : null}
+
+            <div className="flex flex-wrap gap-2 border-t border-line pt-4">
+              <Link
+                to={`/cases/${caseId}/graph?focusType=event&focusId=${selected.id}`}
+              >
+                <Button size="sm" variant="secondary">
+                  View in graph
+                </Button>
+              </Link>
+              <Link
+                to={`/cases/${caseId}/ai?focusType=event&focusId=${selected.id}`}
+              >
+                <Button size="sm" variant="secondary">
+                  Ask AI about this event
+                </Button>
+              </Link>
+              <Link
+                to={`/cases/${caseId}/evidence?evidenceId=${selected.evidence_id}`}
+              >
+                <Button size="sm" variant="secondary">
+                  Open evidence
+                </Button>
+              </Link>
+              {Number.isFinite(Number(selected.attributes_json?.latitude)) &&
+              Number.isFinite(Number(selected.attributes_json?.longitude)) ? (
+                <Link
+                  to={`/cases/${caseId}/spatial?event=${selected.id}`}
+                >
+                  <Button size="sm" variant="secondary">
+                    View on map
+                  </Button>
+                </Link>
+              ) : null}
+            </div>
           </div>
         ) : null}
       </Drawer>

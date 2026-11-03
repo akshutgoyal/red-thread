@@ -1,14 +1,16 @@
-import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   Bot,
+  Save,
   Send,
   ShieldAlert,
   Sparkles,
   Trash2,
 } from "lucide-react";
-import { useAiStatus, useAskAi } from "@/hooks/useApi";
+import { useAiStatus, useAskAi, useCreateAnnotation } from "@/hooks/useApi";
+import { useToast } from "@/components/ui/Toast";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -31,13 +33,91 @@ const SUGGESTIONS = [
   "Summarize the investigation and separate observations from hypotheses.",
 ];
 
+function citationHref(citation: AiAnswer["citations"][number], caseId: string): string | null {
+  if (citation.event_id) return `/cases/${caseId}/timeline?event=${encodeURIComponent(citation.event_id)}`;
+  if (citation.evidence_id) return `/cases/${caseId}/evidence?evidenceId=${encodeURIComponent(citation.evidence_id)}`;
+  if (citation.kind === "relationship" && citation.id) {
+    return `/cases/${caseId}/graph?focusType=relationship&focusId=${encodeURIComponent(citation.id)}`;
+  }
+  if (citation.kind === "finding") return `/cases/${caseId}/findings`;
+  return null;
+}
+
 export function AiAssistantPage() {
   const { caseId } = useParams<{ caseId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusType = searchParams.get("focusType");
+  const focusId = searchParams.get("focusId");
+  const toast = useToast();
   const statusQuery = useAiStatus();
   const askAi = useAskAi(caseId ?? "");
+  const createAnnotation = useCreateAnnotation(caseId ?? "");
+  const transcriptKey = caseId ? `red-thread.ai.transcript.${caseId}` : "";
   const [question, setQuestion] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    if (!transcriptKey) return [];
+    try {
+      const raw = sessionStorage.getItem(transcriptKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? (parsed as ChatMessage[]).slice(-20) : [];
+    } catch {
+      return [];
+    }
+  });
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!transcriptKey) return;
+    try {
+      sessionStorage.setItem(transcriptKey, JSON.stringify(messages.slice(-20)));
+    } catch {
+      // Session storage can be unavailable in hardened browser contexts.
+    }
+  }, [messages, transcriptKey]);
+
+  function clearConversation() {
+    setMessages([]);
+    try {
+      if (transcriptKey) sessionStorage.removeItem(transcriptKey);
+    } catch {
+      // Ignore storage failures.
+    }
+  }
+
+  function saveHypothesis(message: ChatMessage) {
+    if (!caseId || !message.answer) return;
+    const allowed = new Set([
+      "case",
+      "evidence",
+      "event",
+      "entity",
+      "finding",
+      "relationship",
+    ]);
+    const targetType = focusType && allowed.has(focusType) ? focusType : "case";
+    const targetId = focusType && focusId && allowed.has(focusType) ? focusId : caseId;
+    createAnnotation.mutate(
+      {
+        target_type: targetType,
+        target_id: targetId,
+        author: "Investigator",
+        note: [
+          "AI-generated hypothesis — requires human verification.",
+          "",
+          message.content,
+          "",
+          `Provider: ${message.answer.provider} · model: ${message.answer.model}`,
+          `Verified citations: ${message.answer.citations.filter((item) => item.verified).length}/${message.answer.citations.length}`,
+        ].join("\n"),
+      },
+      {
+        onSuccess: () =>
+          toast.push("success", "Saved as hypothesis", "The annotation is now in the audit trail."),
+        onError: (mutationError) =>
+          toast.push("error", "Could not save hypothesis", mutationError.message),
+      },
+    );
+  }
 
   if (!caseId) return <ErrorState title="Missing case ID" />;
   if (statusQuery.isLoading) return <LoadingState label="Checking AI configuration…" />;
@@ -58,7 +138,11 @@ export function AiAssistantPage() {
     setMessages((current) => [...current, userMessage]);
     setQuestion("");
     try {
-      const answer = await askAi.mutateAsync({ question: trimmed });
+      const answer = await askAi.mutateAsync({
+        question: trimmed,
+        focus_type: focusType,
+        focus_id: focusId,
+      });
       setMessages((current) => [
         ...current,
         {
@@ -141,7 +225,7 @@ TOKENHARBOR_MODEL=deepseek-v4.1-flash:free`}
           <Button
             variant="secondary"
             icon={<Trash2 size={14} />}
-            onClick={() => setMessages([])}
+            onClick={clearConversation}
           >
             Clear conversation
           </Button>
@@ -155,6 +239,31 @@ TOKENHARBOR_MODEL=deepseek-v4.1-flash:free`}
           · external provider: <span className="font-mono text-[11px]">{status.provider}</span> ·
           selected evidence excerpts will be sent to that provider.
         </span>
+      </div>
+
+      {focusId ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-accent/25 bg-accent/5 px-4 py-2.5 text-xs text-secondary">
+          <span className="font-semibold text-accent">Focused context</span>
+          <span>
+            {focusType ?? "record"}:{" "}
+            <span className="font-mono text-[11px] text-primary">{focusId}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setSearchParams({})}
+            className="ml-auto rounded-md border border-line px-2 py-1 text-[10px] text-muted hover:text-primary"
+          >
+            Clear focus
+          </button>
+        </div>
+      ) : null}
+
+      <div className="mb-4 rounded-xl border border-line bg-surface-2/40 px-4 py-3 text-[10px] leading-relaxed text-muted">
+        <span className="font-semibold uppercase tracking-wider text-secondary">
+          Human review vocabulary:
+        </span>{" "}
+        OBSERVATION · CORRELATION · INFERENCE · HYPOTHESIS. AI output is an interpretation;
+        saved hypotheses remain unverified until an investigator reviews the underlying evidence.
       </div>
 
       <Card>
@@ -230,21 +339,39 @@ TOKENHARBOR_MODEL=deepseek-v4.1-flash:free`}
                         Citations
                       </p>
                       <div className="flex flex-wrap gap-1.5">
-                        {message.answer.citations.map((citation, index) => (
-                          <span
-                            key={`${citation.id ?? citation.evidence_id ?? citation.event_id ?? index}`}
-                            className={`rounded-md border px-2 py-1 font-mono text-[10px] ${
-                              citation.verified
-                                ? "border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-200"
-                                : "border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-200"
-                            }`}
-                            title={citation.source_locator ?? citation.warning ?? undefined}
-                          >
-                            {citation.evidence_id ?? citation.event_id ?? citation.label ?? "reference"}
-                            {citation.source_locator ? `:${citation.source_locator}` : ""} ·{" "}
-                            {citation.verified ? "verified" : "unverified"}
-                          </span>
-                        ))}
+                        {message.answer.citations.map((citation, index) => {
+                          const href = citationHref(citation, caseId);
+                          const chipClass = `rounded-md border px-2 py-1 font-mono text-[10px] ${
+                            citation.verified
+                              ? "border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-200"
+                              : "border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-200"
+                          }`;
+                          const content = (
+                            <>
+                              {citation.evidence_id ?? citation.event_id ?? citation.label ?? "reference"}
+                              {citation.source_locator ? `:${citation.source_locator}` : ""} ·{" "}
+                              {citation.verified ? "verified" : "unverified"}
+                            </>
+                          );
+                          return href ? (
+                            <Link
+                              key={`${citation.id ?? citation.evidence_id ?? citation.event_id ?? index}`}
+                              to={href}
+                              className={`${chipClass} hover:border-accent/50`}
+                              title={citation.source_locator ?? citation.warning ?? undefined}
+                            >
+                              {content}
+                            </Link>
+                          ) : (
+                            <span
+                              key={`${citation.id ?? citation.evidence_id ?? citation.event_id ?? index}`}
+                              className={chipClass}
+                              title={citation.source_locator ?? citation.warning ?? undefined}
+                            >
+                              {content}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
                   ) : null}
@@ -285,6 +412,20 @@ TOKENHARBOR_MODEL=deepseek-v4.1-flash:free`}
                           <li key={index}>{item}</li>
                         ))}
                       </ul>
+                    </div>
+                  ) : null}
+
+                  {message.role === "assistant" && message.answer && !message.answer.insufficient_evidence ? (
+                    <div className="mt-3 flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        icon={<Save size={13} />}
+                        loading={createAnnotation.isPending}
+                        onClick={() => saveHypothesis(message)}
+                      >
+                        Save as hypothesis
+                      </Button>
                     </div>
                   ) : null}
                 </div>

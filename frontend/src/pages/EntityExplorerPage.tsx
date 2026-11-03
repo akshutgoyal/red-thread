@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { Search, Waypoints } from "lucide-react";
-import { useEntities, useEntityDetail } from "@/hooks/useApi";
+import { useEntities, useEntityDetail, useEvidence } from "@/hooks/useApi";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Field";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
 import { RelationshipEvidencePanel } from "@/components/relationship/RelationshipEvidencePanel";
@@ -21,6 +22,7 @@ const TYPE_COLORS: Record<string, string> = {
 export function EntityExplorerPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const entitiesQuery = useEntities(caseId);
+  const evidenceQuery = useEvidence(caseId ?? "");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
@@ -28,6 +30,11 @@ export function EntityExplorerPage() {
   const detailQuery = useEntityDetail(caseId, selectedEntityId);
 
   const entities = useMemo(() => entitiesQuery.data ?? [], [entitiesQuery.data]);
+  const evidenceNames = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const item of evidenceQuery.data ?? []) map.set(item.id, item.original_filename);
+    return map;
+  }, [evidenceQuery.data]);
   const types = useMemo(
     () => Array.from(new Set(entities.map((entity) => entity.entity_type))).sort(),
     [entities],
@@ -167,14 +174,30 @@ export function EntityExplorerPage() {
                   title={detail.entity.value_normalized || detail.entity.value_original}
                   subtitle={`${humanize(detail.entity.entity_type)} · ${detail.mention_count} mentions · ${detail.evidence_ids.length} evidence sources`}
                   action={
-                    <Badge
-                      className={
-                        TYPE_COLORS[detail.entity.entity_type] ??
-                        "border-line bg-surface-2 text-secondary"
-                      }
-                    >
-                      {humanize(detail.entity.entity_type)}
-                    </Badge>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge
+                        className={
+                          TYPE_COLORS[detail.entity.entity_type] ??
+                          "border-line bg-surface-2 text-secondary"
+                        }
+                      >
+                        {humanize(detail.entity.entity_type)}
+                      </Badge>
+                      <Link
+                        to={`/cases/${caseId}/graph?focusType=entity&focusId=${detail.entity.id}`}
+                      >
+                        <Button size="sm" variant="secondary">
+                          View in graph
+                        </Button>
+                      </Link>
+                      <Link
+                        to={`/cases/${caseId}/ai?focusType=entity&focusId=${detail.entity.id}`}
+                      >
+                        <Button size="sm" variant="secondary">
+                          Ask AI
+                        </Button>
+                      </Link>
+                    </div>
                   }
                 />
                 <CardBody className="space-y-4">
@@ -191,6 +214,37 @@ export function EntityExplorerPage() {
                         {detail.entity.value_normalized}
                       </p>
                     </div>
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted">
+                      Evidence presence
+                    </p>
+                    {detail.evidence_ids.length === 0 ? (
+                      <p className="text-xs text-muted">No evidence sources are linked.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {detail.evidence_ids.map((evidenceId) => {
+                          const count = detail.events.filter(
+                            (event) => event.evidence_id === evidenceId,
+                          ).length;
+                          return (
+                            <div
+                              key={evidenceId}
+                              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-surface-2/40 px-3 py-2"
+                            >
+                              <Link
+                                className="text-xs font-medium text-accent hover:underline"
+                                to={`/cases/${caseId}/evidence?evidenceId=${evidenceId}`}
+                              >
+                                {evidenceNames.get(evidenceId) ?? evidenceId}
+                              </Link>
+                              <span className="text-[10px] text-muted">{count} events</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -265,6 +319,20 @@ export function EntityExplorerPage() {
                           <p className="mt-1 text-[11px] text-secondary">
                             {event.source_filename} · {event.source_locator}
                           </p>
+                          <div className="mt-1.5 flex flex-wrap gap-3 text-[10px] font-medium">
+                            <Link
+                              className="text-accent hover:underline"
+                              to={`/cases/${caseId}/timeline?event=${event.id}`}
+                            >
+                              View timeline event
+                            </Link>
+                            <Link
+                              className="text-accent hover:underline"
+                              to={`/cases/${caseId}/evidence?evidenceId=${event.evidence_id}`}
+                            >
+                              Open evidence
+                            </Link>
+                          </div>
                         </div>
                       ))}
                     </div>

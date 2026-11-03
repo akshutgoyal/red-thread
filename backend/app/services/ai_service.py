@@ -440,6 +440,9 @@ def _build_context(
     case: Case,
     question: str,
     settings: Settings,
+    *,
+    focus_type: str | None = None,
+    focus_id: str | None = None,
 ) -> tuple[str, dict[str, set[str]], dict[str, Any]]:
     evidence = list(
         db.scalars(
@@ -621,6 +624,9 @@ def _build_context(
         else:
             break
         context_json = json.dumps(context, ensure_ascii=False, default=str)
+
+    if focus_type and focus_id:
+        context["focus"] = {"type": focus_type, "id": focus_id}
 
     context_ids = {
         "evidence": {item.id for item in evidence},
@@ -870,6 +876,8 @@ async def check_provider(
     status: ProviderStatus,
     settings: Settings,
     *,
+    focus_type: str | None = None,
+    focus_id: str | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> dict[str, Any]:
     try:
@@ -899,6 +907,8 @@ async def ask_ai(
     question: str,
     settings: Settings,
     *,
+    focus_type: str | None = None,
+    focus_id: str | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> dict[str, Any]:
     case = db.get(Case, case_id)
@@ -916,7 +926,9 @@ async def ask_ai(
             ),
         )
 
-    context_json, context_ids, context_maps = _build_context(db, case, question, settings)
+    context_json, context_ids, context_maps = _build_context(
+        db, case, question, settings, focus_type=focus_type, focus_id=focus_id
+    )
     safe_context = context_json.replace("</evidence_context>", "<\\/evidence_context>")
     user_prompt = (
         "Investigator question:\n"

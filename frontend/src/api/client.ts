@@ -222,11 +222,28 @@ export const api = {
     `${API_BASE}/cases/${caseId}/auth/export${query({ format })}`,
 
   aiStatus: () => request<AiStatus>("/ai/status"),
-  askAi: (caseId: string, question: string) =>
+  askAi: (
+    caseId: string,
+    payload: { question: string; focus_type?: string | null; focus_id?: string | null },
+  ) =>
     request<AiAnswer>(`/cases/${caseId}/ai/ask`, {
       method: "POST",
       caseId,
-      body: { question },
+      body: payload,
+    }),
+  createAnnotation: (
+    caseId: string,
+    payload: {
+      target_type: string;
+      target_id: string;
+      author?: string;
+      note: string;
+    },
+  ) =>
+    request<unknown>(`/cases/${caseId}/annotations`, {
+      method: "POST",
+      caseId,
+      body: payload,
     }),
 
   listReports: (caseId: string) => request<ReportRecord[]>(`/cases/${caseId}/reports`, { caseId }),

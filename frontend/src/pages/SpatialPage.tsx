@@ -1,21 +1,26 @@
-import { useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
-import { Crosshair, MapPin } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { MapPin } from "lucide-react";
 import { useEvidence, useSpatial } from "@/hooks/useApi";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
 import { RelationshipEvidencePanel } from "@/components/relationship/RelationshipEvidencePanel";
+import { SpatialMap } from "@/components/spatial/SpatialMap";
 import { formatDateTime, humanize } from "@/lib/format";
-import type { SpatialObservation } from "@/types";
 
 export function SpatialPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const spatialQuery = useSpatial(caseId);
   const evidenceQuery = useEvidence(caseId);
+  const [searchParams] = useSearchParams();
+  const deepEventId = searchParams.get("event");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState("all");
+  const [entityFilter, setEntityFilter] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [relationshipId, setRelationshipId] = useState<string | null>(null);
 
   const evidenceById = useMemo(
@@ -23,16 +28,33 @@ export function SpatialPage() {
     [evidenceQuery.data],
   );
 
+  useEffect(() => {
+    if (!deepEventId) return;
+    const match = (spatialQuery.data?.observations ?? []).find(
+      (item) => item.event_id === deepEventId,
+    );
+    if (match) setSelectedId(match.event_id);
+  }, [deepEventId, spatialQuery.data]);
+
   if (!caseId) return <ErrorState title="Missing case ID" />;
   if (spatialQuery.isLoading) return <LoadingState label="Loading documented locations…" />;
   if (spatialQuery.error)
     return <ErrorState message={spatialQuery.error.message} onRetry={() => spatialQuery.refetch()} />;
 
   const data = spatialQuery.data;
-  const observations = (data?.observations ?? []).filter(
-    (item) => typeFilter === "all" || item.event_type === typeFilter,
-  );
-  const types = Array.from(new Set((data?.observations ?? []).map((item) => item.event_type))).sort();
+  const allObservations = data?.observations ?? [];
+  const observations = allObservations.filter((item) => {
+    if (typeFilter !== "all" && item.event_type !== typeFilter) return false;
+    if (entityFilter !== "all" && !item.entity_values.includes(entityFilter)) return false;
+    const day = item.timestamp_normalized?.slice(0, 10);
+    if (startDate && (!day || day < startDate)) return false;
+    if (endDate && (!day || day > endDate)) return false;
+    return true;
+  });
+  const types = Array.from(new Set(allObservations.map((item) => item.event_type))).sort();
+  const entityOptions = Array.from(
+    new Set(allObservations.flatMap((item) => item.entity_values)),
+  ).sort();
   const selected = observations.find((item) => item.event_id === selectedId) ?? null;
 
   return (
@@ -45,8 +67,44 @@ export function SpatialPage() {
 
       <p className="text-xs text-muted">
         Map times are normalized to UTC. Original source timestamps and their timezone
-        context remain available in the timeline and evidence records.
+        context remain available in the timeline and evidence records. Map tiles load from
+        OpenStreetMap by default; set VITE_MAP_TILE_URL to use a local tile server.
       </p>
+
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+          Filters
+        </span>
+        <select
+          value={entityFilter}
+          onChange={(event) => setEntityFilter(event.target.value)}
+          className="rounded-lg border border-line-strong bg-surface-2 px-2 py-1.5 text-[11px] text-primary"
+        >
+          <option value="all">All entities</option>
+          {entityOptions.map((value) => (
+            <option key={value} value={value}>
+              {value}
+            </option>
+          ))}
+        </select>
+        <input
+          type="date"
+          value={startDate}
+          onChange={(event) => setStartDate(event.target.value)}
+          className="rounded-lg border border-line-strong bg-surface-2 px-2 py-1.5 text-[11px] text-primary"
+          aria-label="Start date"
+        />
+        <input
+          type="date"
+          value={endDate}
+          onChange={(event) => setEndDate(event.target.value)}
+          className="rounded-lg border border-line-strong bg-surface-2 px-2 py-1.5 text-[11px] text-primary"
+          aria-label="End date"
+        />
+        <span className="text-[10px] text-muted">
+          {observations.length} of {allObservations.length} observations shown
+        </span>
+      </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
         <Card>
@@ -76,7 +134,7 @@ export function SpatialPage() {
                 description="Upload GPS or CCTV metadata with valid latitude and longitude to populate this view."
               />
             ) : (
-              <SpatialPlot observations={observations} selectedId={selectedId} onSelect={setSelectedId} />
+              <SpatialMap observations={observations} selectedId={selectedId} onSelect={setSelectedId} />
             )}
           </CardBody>
         </Card>
@@ -155,6 +213,26 @@ export function SpatialPage() {
                   This plot shows only the recorded coordinate. It does not establish that a person or
                   device was at the location for the whole interval, nor does proximity prove association.
                 </p>
+                <div className="flex flex-wrap gap-3 text-[10px] font-medium">
+                  <Link
+                    className="text-accent hover:underline"
+                    to={`/cases/${caseId}/timeline?event=${selected.event_id}`}
+                  >
+                    View timeline event
+                  </Link>
+                  <Link
+                    className="text-accent hover:underline"
+                    to={`/cases/${caseId}/evidence?evidenceId=${selected.evidence_id}`}
+                  >
+                    Open source evidence
+                  </Link>
+                  <Link
+                    className="text-accent hover:underline"
+                    to={`/cases/${caseId}/ai?focusType=event&focusId=${selected.event_id}`}
+                  >
+                    Ask AI about this observation
+                  </Link>
+                </div>
               </CardBody>
             </Card>
           ) : null}
@@ -201,88 +279,6 @@ export function SpatialPage() {
           </CardBody>
         </Card>
       ) : null}
-    </div>
-  );
-}
-
-function SpatialPlot({
-  observations,
-  selectedId,
-  onSelect,
-}: {
-  observations: SpatialObservation[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-}) {
-  const lats = observations.map((item) => item.latitude);
-  const lons = observations.map((item) => item.longitude);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLon = Math.min(...lons);
-  const maxLon = Math.max(...lons);
-  const latSpan = maxLat - minLat || 0.01;
-  const lonSpan = maxLon - minLon || 0.01;
-  const project = (observation: SpatialObservation) => ({
-    x: 10 + ((observation.longitude - minLon) / lonSpan) * 80,
-    y: 10 + ((maxLat - observation.latitude) / latSpan) * 80,
-  });
-
-  return (
-    <div className="relative overflow-hidden rounded-xl border border-line bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.08),transparent_65%)]">
-      <svg viewBox="0 0 100 100" className="h-[360px] w-full">
-        {Array.from({ length: 9 }).map((_, index) => (
-          <g key={index}>
-            <line
-              x1={10 + index * 10}
-              y1={10}
-              x2={10 + index * 10}
-              y2={90}
-              stroke="currentColor"
-              strokeWidth={0.15}
-              className="text-line"
-            />
-            <line
-              x1={10}
-              y1={10 + index * 10}
-              x2={90}
-              y2={10 + index * 10}
-              stroke="currentColor"
-              strokeWidth={0.15}
-              className="text-line"
-            />
-          </g>
-        ))}
-        {observations.map((observation) => {
-          const { x, y } = project(observation);
-          const selected = selectedId === observation.event_id;
-          return (
-            <g
-              key={observation.event_id}
-              onClick={() => onSelect(observation.event_id)}
-              className="cursor-pointer"
-            >
-              <circle
-                cx={x}
-                cy={y}
-                r={selected ? 3.2 : 2.2}
-                className={selected ? "fill-accent" : "fill-sky-500/80"}
-              />
-              <circle cx={x} cy={y} r={5.5} className="fill-transparent stroke-accent/30" strokeWidth={0.4} />
-              <text
-                x={x + 3.8}
-                y={y + 1}
-                className="fill-current text-[2.6px] text-primary"
-              >
-                {observation.label || humanize(observation.event_type)}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-      <div className="absolute bottom-2 left-3 flex items-center gap-1.5 text-[10px] text-muted">
-        <Crosshair size={11} />
-        Documented points only — not a route reconstruction
-      </div>
     </div>
   );
 }

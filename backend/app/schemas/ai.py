@@ -17,6 +17,8 @@ class AiStatusResponse(BaseModel):
 
 class AiAskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
+    focus_type: str | None = Field(default=None, max_length=64)
+    focus_id: str | None = Field(default=None, max_length=128)
 
 
 class AiCitationRead(BaseModel):

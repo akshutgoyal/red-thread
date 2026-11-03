@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Check, FileSearch, ShieldAlert, X } from "lucide-react";
 import { useEvidence, useRelationship, useReviewRelationship } from "@/hooks/useApi";
 import { useToast } from "@/components/ui/Toast";
@@ -145,11 +146,38 @@ export function RelationshipEvidencePanel({
                     {support.snippet}
                   </p>
                 ) : null}
+                <div className="mt-1.5 flex flex-wrap gap-3 text-[10px] font-medium">
+                  {support.evidence_id ? (
+                    <Link
+                      className="text-accent hover:underline"
+                      to={`/cases/${caseId}/evidence?evidenceId=${support.evidence_id}`}
+                    >
+                      Open evidence
+                    </Link>
+                  ) : null}
+                  {support.event_id ? (
+                    <Link
+                      className="text-accent hover:underline"
+                      to={`/cases/${caseId}/timeline?event=${support.event_id}`}
+                    >
+                      View event
+                    </Link>
+                  ) : null}
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      <Link
+        to={`/cases/${caseId}/ai?focusType=relationship&focusId=${relationshipId}`}
+        className="inline-flex"
+      >
+        <Button size="sm" variant="secondary">
+          Ask AI about this relationship
+        </Button>
+      </Link>
 
       <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-[10px] leading-relaxed text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/5 dark:text-amber-100/80">
         <ShieldAlert size={12} className="mr-1 inline" />

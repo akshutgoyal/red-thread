@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import cytoscape, { type Core, type ElementDefinition } from "cytoscape";
-import { GitBranch, Info, RefreshCcw } from "lucide-react";
+import { GitBranch, Info, RefreshCcw, Search } from "lucide-react";
 import { useGraph } from "@/hooks/useApi";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
-import { Select } from "@/components/ui/Field";
+import { Input, Select } from "@/components/ui/Field";
 import { RelationshipEvidencePanel } from "@/components/relationship/RelationshipEvidencePanel";
 import { cn } from "@/lib/cn";
 import { useTheme } from "@/theme/ThemeContext";
@@ -80,19 +80,30 @@ export function GraphPage() {
   const { theme } = useTheme();
   const nodeColors = theme === "dark" ? NODE_COLORS_DARK : NODE_COLORS_LIGHT;
   const palette = GRAPH_PALETTES[theme];
+  const [searchParams] = useSearchParams();
+  const focusType = searchParams.get("focusType");
+  const focusId = searchParams.get("focusId");
   const [includeTemporal, setIncludeTemporal] = useState(false);
   const [layout, setLayout] = useState("cose");
   const [showEvidence, setShowEvidence] = useState(true);
   const [showEvents, setShowEvents] = useState(true);
   const [showEntities, setShowEntities] = useState(true);
   const [selected, setSelected] = useState<SelectedElement | null>(null);
+  const [search, setSearch] = useState(focusId ?? "");
+  const [classificationFilter, setClassificationFilter] = useState("all");
+  const [neighbourFocus, setNeighbourFocus] = useState(false);
   const graphQuery = useGraph(caseId, includeTemporal);
+
+  useEffect(() => {
+    if (focusId) setSearch(focusId);
+  }, [focusId]);
 
   const nodes = useMemo(() => graphQuery.data?.nodes ?? [], [graphQuery.data]);
   const edges = useMemo(() => graphQuery.data?.edges ?? [], [graphQuery.data]);
 
   const visibleElements = useMemo<ElementDefinition[]>(() => {
-    const allowedNodeIds = new Set(
+    const searchTerm = search.trim().toLowerCase();
+    let allowedNodeIds = new Set(
       nodes
         .filter((node) =>
           node.node_type === "evidence"
@@ -103,6 +114,34 @@ export function GraphPage() {
         )
         .map((node) => node.id),
     );
+
+    if (searchTerm) {
+      const matching = new Set(
+        nodes
+          .filter((node) =>
+            `${node.id} ${node.label} ${JSON.stringify(node.data)}`
+              .toLowerCase()
+              .includes(searchTerm),
+          )
+          .map((node) => node.id),
+      );
+      allowedNodeIds = new Set(
+        [...allowedNodeIds].filter((id) => matching.has(id)),
+      );
+    }
+
+    if (neighbourFocus && selected?.kind === "node") {
+      const selectedId = String(selected.data.id);
+      const neighbours = new Set<string>([selectedId]);
+      for (const edge of edges) {
+        if (edge.source === selectedId) neighbours.add(edge.target);
+        if (edge.target === selectedId) neighbours.add(edge.source);
+      }
+      allowedNodeIds = new Set(
+        [...allowedNodeIds].filter((id) => neighbours.has(id)),
+      );
+    }
+
     const nodeElements = nodes
       .filter((node) => allowedNodeIds.has(node.id))
       .map((node) => ({
@@ -119,6 +158,11 @@ export function GraphPage() {
       }));
     const edgeElements = edges
       .filter((edge) => allowedNodeIds.has(edge.source) && allowedNodeIds.has(edge.target))
+      .filter(
+        (edge) =>
+          classificationFilter === "all" ||
+          edge.classification === classificationFilter,
+      )
       .map((edge) => ({
         data: {
           ...(edge.data ?? {}),
@@ -139,7 +183,18 @@ export function GraphPage() {
         },
       }));
     return [...nodeElements, ...edgeElements];
-  }, [nodes, edges, showEvidence, showEvents, showEntities, nodeColors]);
+  }, [
+    nodes,
+    edges,
+    showEvidence,
+    showEvents,
+    showEntities,
+    nodeColors,
+    search,
+    classificationFilter,
+    neighbourFocus,
+    selected,
+  ]);
 
   if (!caseId) return <ErrorState title="Missing case ID" />;
   if (graphQuery.isLoading) return <LoadingState label="Building relationship graph…" />;
@@ -154,6 +209,29 @@ export function GraphPage() {
         description="Exact identifier matches are labelled separately from heuristic leads. A temporal proximity edge is a lead, not proof of a relationship."
         actions={
           <>
+            <div className="relative">
+              <Search
+                size={13}
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"
+              />
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search nodes, entities, rules…"
+                className="w-56 pl-8 text-xs"
+              />
+            </div>
+            <Select
+              value={classificationFilter}
+              onChange={(event) => setClassificationFilter(event.target.value)}
+              className="w-40 text-xs"
+            >
+              <option value="all">All classifications</option>
+              <option value="observation">Observation</option>
+              <option value="correlation">Correlation</option>
+              <option value="inference">Inference</option>
+              <option value="hypothesis">Hypothesis</option>
+            </Select>
             <Button
               variant={includeTemporal ? "primary" : "secondary"}
               icon={<RefreshCcw size={14} />}
@@ -225,7 +303,9 @@ export function GraphPage() {
           <Card>
             <CardHeader title="Selection" subtitle="Click a node or edge" />
             <CardBody>
-              {!selected ? (
+              {!selected && focusType === "relationship" && focusId ? (
+                <RelationshipEvidencePanel caseId={caseId} relationshipId={focusId} />
+              ) : !selected ? (
                 <p className="text-xs text-muted">
                   Select a node or edge to inspect its explanation and supporting records.
                 </p>
@@ -240,6 +320,15 @@ export function GraphPage() {
                   <Badge className="border-accent/30 bg-accent/10 text-accent">
                     {selected.kind}
                   </Badge>
+                  {selected.kind === "node" ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setNeighbourFocus((current) => !current)}
+                    >
+                      {neighbourFocus ? "Show full graph" : "Focus neighbours"}
+                    </Button>
+                  ) : null}
                   <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-line bg-surface-2/60 p-3 font-mono text-[10px] leading-relaxed text-secondary">
                     {JSON.stringify(selected.data, null, 2)}
                   </pre>

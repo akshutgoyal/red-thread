@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Copy,
@@ -41,11 +41,19 @@ export function EvidenceVaultPage() {
   const auditQuery = useAudit(caseId);
   const verify = useVerifyEvidence(caseId ?? "");
   const parse = useParseEvidence(caseId ?? "");
+  const [searchParams] = useSearchParams();
+  const deepEvidenceId = searchParams.get("evidenceId");
   const [selected, setSelected] = useState<Evidence | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
 
   const evidence = useMemo(() => evidenceQuery.data ?? [], [evidenceQuery.data]);
+
+  useEffect(() => {
+    if (!deepEvidenceId) return;
+    const match = evidence.find((item) => item.id === deepEvidenceId);
+    if (match) setSelected(match);
+  }, [deepEvidenceId, evidence]);
   const filtered = useMemo(
     () =>
       evidence.filter((item) => {

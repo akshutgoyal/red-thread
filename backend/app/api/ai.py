@@ -29,7 +29,14 @@ async def ask_ai(
 ) -> AiAnswerResponse:
     get_case_or_404(db, case_id)
     try:
-        result = await ai_service.ask_ai(db, case_id, payload.question, settings)
+        result = await ai_service.ask_ai(
+            db,
+            case_id,
+            payload.question,
+            settings,
+            focus_type=payload.focus_type,
+            focus_id=payload.focus_id,
+        )
     except ai_service.AIError as error:
         raise HTTPException(status_code=error.status_code, detail=error.message) from error
     return AiAnswerResponse(**result)

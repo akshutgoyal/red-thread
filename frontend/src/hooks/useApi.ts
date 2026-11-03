@@ -267,7 +267,15 @@ export function useReviewRelationship(caseId: string) {
 
 export function useAskAi(caseId: string) {
   return useMutation({
-    mutationFn: ({ question }: { question: string }) => api.askAi(caseId, question),
+    mutationFn: (payload: Parameters<typeof api.askAi>[1]) =>
+      api.askAi(caseId, payload),
+  });
+}
+
+export function useCreateAnnotation(caseId: string) {
+  return useMutation({
+    mutationFn: (payload: Parameters<typeof api.createAnnotation>[1]) =>
+      api.createAnnotation(caseId, payload),
   });
 }
 
