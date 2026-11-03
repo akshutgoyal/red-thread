@@ -276,6 +276,7 @@ def list_entities(
     query = select(Entity).where(Entity.case_id == case_id)
     if entity_type:
         query = query.where(Entity.entity_type == entity_type)
+    query = query.options(selectinload(Entity.event_links).selectinload(EventEntity.event))
     return list(db.scalars(query.order_by(Entity.entity_type, Entity.value_original)))
 
 

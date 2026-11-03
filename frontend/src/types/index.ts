@@ -97,6 +97,10 @@ export interface EntityRecord {
   value_original: string;
   value_normalized: string;
   normalization_method: string;
+  event_count?: number;
+  evidence_ids?: string[];
+  first_seen_at?: string | null;
+  last_seen_at?: string | null;
 }
 
 export interface GraphNode {

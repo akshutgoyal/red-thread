@@ -79,6 +79,38 @@ class Entity(Base):
         back_populates="entity", cascade="all, delete-orphan"
     )
 
+    @property
+    def event_count(self) -> int:
+        return len({link.event_id for link in self.event_links})
+
+    @property
+    def evidence_ids(self) -> list[str]:
+        return sorted(
+            {
+                link.event.evidence_id
+                for link in self.event_links
+                if link.event is not None and link.event.evidence_id
+            }
+        )
+
+    @property
+    def first_seen_at(self) -> datetime | None:
+        timestamps = [
+            link.event.timestamp_normalized or link.event.created_at
+            for link in self.event_links
+            if link.event is not None
+        ]
+        return min(timestamps) if timestamps else None
+
+    @property
+    def last_seen_at(self) -> datetime | None:
+        timestamps = [
+            link.event.timestamp_normalized or link.event.created_at
+            for link in self.event_links
+            if link.event is not None
+        ]
+        return max(timestamps) if timestamps else None
+
 
 class EventEntity(Base):
     __tablename__ = "event_entities"

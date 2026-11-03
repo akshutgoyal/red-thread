@@ -49,6 +49,10 @@ class EntityRead(BaseModel):
     value_original: str
     value_normalized: str
     normalization_method: str
+    event_count: int = 0
+    evidence_ids: list[str] = []
+    first_seen_at: datetime | None = None
+    last_seen_at: datetime | None = None
 
 
 class GraphNodeRead(BaseModel):

@@ -409,11 +409,11 @@ def _question_terms(question: str) -> tuple[set[str], set[str]]:
 
 
 _LOCATOR_RE = re.compile(
-    r"\b(?:line|row|page|record|message|bbox)\s*:\s*[\d,\s]+",
+    r"\b(?:line|row|page|record|message|bbox|trackpoint|trkpt|placemark|fix|frame|segment)\s*:\s*[\d,\s]+",
     re.IGNORECASE,
 )
 _PLURAL_LOCATOR_RE = re.compile(
-    r"\b(lines|rows|pages|records|messages)\s+([\d,\s]+)",
+    r"\b(lines|rows|pages|records|messages|trackpoints|placemarks|frames|segments)\s+([\d,\s]+)",
     re.IGNORECASE,
 )
 

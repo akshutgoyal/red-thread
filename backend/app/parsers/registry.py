@@ -91,10 +91,10 @@ def _detect_csv(path: Path) -> BaseParser:
         and any(token in header for token in ("subject", "body", "message_id"))
     ):
         return PARSER_BY_NAME["email"]
-    if any(token in header for token in ("latitude", "longitude", "gps_lat", "gps_lon")):
-        return PARSER_BY_NAME["gps"]
     if any(token in header for token in ("camera_id", "cctv", "recording_start", "recording_end")):
         return PARSER_BY_NAME["cctv"]
+    if any(token in header for token in ("latitude", "longitude", "gps_lat", "gps_lon")):
+        return PARSER_BY_NAME["gps"]
     if any(token in header for token in ("caller", "receiver", "call_type", "duration")):
         return PARSER_BY_NAME["call_log"]
     if any(token in header for token in ("utr", "payee", "payer", "transaction", "amount")):
@@ -110,10 +110,10 @@ def _detect_csv(path: Path) -> BaseParser:
 
 def _detect_json(path: Path) -> BaseParser:
     head = _read_head(path, 8192).lower()
-    if '"latitude"' in head and '"longitude"' in head:
-        return PARSER_BY_NAME["gps"]
     if '"camera_id"' in head or '"recording_start"' in head:
         return PARSER_BY_NAME["cctv"]
+    if '"latitude"' in head and '"longitude"' in head:
+        return PARSER_BY_NAME["gps"]
     if '"caller"' in head or '"receiver"' in head:
         return PARSER_BY_NAME["call_log"]
     if '"utr"' in head or '"payee"' in head or '"transaction_id"' in head:
@@ -161,7 +161,19 @@ def detect_parser(path: Path, filename: str | None = None, hint: str | None = No
         return PARSER_BY_NAME["gps"]
     if suffix in {".png", ".jpg", ".jpeg"}:
         return PARSER_BY_NAME["image"]
-    if "auth" in name or suffix == ".log":
+    if suffix == ".log":
+        return PARSER_BY_NAME["auth_log"]
+    if suffix == ".pdf":
+        return PARSER_BY_NAME["invoice"]
+    if suffix == ".csv":
+        return _detect_csv(path)
+    if suffix in {".json", ".jsonl"}:
+        return _detect_json(path)
+    if suffix == ".txt":
+        return _detect_text(path)
+
+    # Filename hints are only a fallback for ambiguous or extensionless files.
+    if "auth" in name:
         return PARSER_BY_NAME["auth_log"]
     if any(token in name for token in ("gps", "location_track", "geotrack")):
         return PARSER_BY_NAME["gps"]
@@ -179,12 +191,4 @@ def detect_parser(path: Path, filename: str | None = None, hint: str | None = No
         return PARSER_BY_NAME["invoice"]
     if any(token in name for token in ("chat", "whatsapp", "message")):
         return PARSER_BY_NAME["chat"]
-    if suffix == ".pdf":
-        return PARSER_BY_NAME["invoice"]
-    if suffix == ".csv":
-        return _detect_csv(path)
-    if suffix in {".json", ".jsonl"}:
-        return _detect_json(path)
-    if suffix == ".txt":
-        return _detect_text(path)
     return None

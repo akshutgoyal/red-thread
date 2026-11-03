@@ -131,6 +131,9 @@ export function EntityExplorerPage() {
                     </div>
                     <p className="mt-1.5 truncate text-xs font-medium text-primary">
                       {entity.value_normalized || entity.value_original}
+                      <span className="ml-2 text-[10px] text-muted">
+                        {entity.event_count ?? 0} events · {entity.evidence_ids?.length ?? 0} sources
+                      </span>
                     </p>
                   </button>
                 ))

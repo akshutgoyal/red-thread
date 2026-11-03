@@ -13,6 +13,18 @@ from ..parsers.base import CanonicalEventDraft, ParserContext, ParseResult
 from ..parsers.registry import SUPPORTED_DESCRIPTION, detect_parser
 from . import audit_service, entity_service, evidence_service, reconciliation_service
 
+MAX_PARSER_WARNINGS = 50
+
+
+def warning_messages(warnings: list) -> list[str]:
+    messages = [warning.message for warning in warnings[:MAX_PARSER_WARNINGS]]
+    if len(warnings) > MAX_PARSER_WARNINGS:
+        omitted = len(warnings) - MAX_PARSER_WARNINGS
+        messages.append(
+            f"{omitted} additional parser warning(s) omitted; review parser limits and malformed records."
+        )
+    return messages
+
 
 def _parser_context(evidence: Evidence, parser_name: str) -> ParserContext:
     settings = get_settings()
@@ -255,7 +267,7 @@ def parse_evidence(
     evidence.processing_error = processing_error
     evidence.metadata_json = {
         **result.metadata,
-        "warnings": [warning.message for warning in result.warnings[:50]],
+        "warnings": warning_messages(result.warnings),
         "events_created": len(events),
         "findings_created": len(auth_findings) + len(reconciliation_findings),
     }
@@ -283,7 +295,7 @@ def parse_evidence(
         "parser_version": result.parser_version,
         "events_created": len(events),
         "findings_created": len(auth_findings) + len(reconciliation_findings),
-        "warnings": [warning.message for warning in result.warnings[:50]],
+        "warnings": warning_messages(result.warnings),
         "summary": {
             "parser_metadata": result.metadata,
             "events_created": len(events),

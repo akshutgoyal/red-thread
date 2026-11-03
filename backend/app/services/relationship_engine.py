@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from ..config import get_settings
-from ..models import Event, EventEntity
+from ..models import Event, EventEntity, InvestigatorAnnotation, Relationship
 from ..utils.geo import haversine_meters, parse_coordinates
 from . import relationship_service
 
@@ -74,7 +74,19 @@ def _add(
     classification: str,
     metadata: dict[str, Any],
     supports: list[dict[str, Any]],
+    generated_keys: set[tuple[str, str, str, str, str, str]] | None = None,
 ) -> None:
+    if generated_keys is not None:
+        generated_keys.add(
+            (
+                source_type,
+                source_id,
+                target_type,
+                target_id,
+                relationship_type,
+                correlation_rule,
+            )
+        )
     relationship_service.upsert_relationship(
         db,
         case_id=case_id,
@@ -136,6 +148,7 @@ def build_case_relationships(db: Session, case_id: str) -> dict[str, int]:
 
     relationship_count = 0
     support_count = 0
+    generated_keys: set[tuple[str, str, str, str, str, str]] = set()
 
     # A. Exact identifier matching across evidence sources.
     for entity_id, linked_events in events_by_entity.items():
@@ -191,6 +204,7 @@ def build_case_relationships(db: Session, case_id: str) -> dict[str, int]:
                     "evidence_ids": sorted({source.evidence_id, target.evidence_id}),
                 },
                 supports=supports,
+            generated_keys=generated_keys,
             )
             relationship_count += 1
             support_count += len(supports)
@@ -248,6 +262,7 @@ def build_case_relationships(db: Session, case_id: str) -> dict[str, int]:
                 "right_value": right.value_original,
             },
             supports=supports,
+            generated_keys=generated_keys,
         )
         relationship_count += 1
         support_count += len(supports)
@@ -301,6 +316,7 @@ def build_case_relationships(db: Session, case_id: str) -> dict[str, int]:
                     "window_seconds": temporal_window,
                 },
                 supports=supports,
+            generated_keys=generated_keys,
             )
             relationship_count += 1
             support_count += len(supports)
@@ -366,6 +382,7 @@ def build_case_relationships(db: Session, case_id: str) -> dict[str, int]:
                 "target_point": right_point,
             },
             supports=supports,
+            generated_keys=generated_keys,
         )
         relationship_count += 1
         support_count += len(supports)
@@ -373,7 +390,309 @@ def build_case_relationships(db: Session, case_id: str) -> dict[str, int]:
         if spatial_created >= max_pairs:
             break
 
+    # E. Communication sequences sharing an identifier. Hypotheses only.
+    communication_types = {"call", "chat", "chat_message", "email", "transaction", "payment"}
+    for entity_id, linked_events in events_by_entity.items():
+        entity = entities[entity_id]
+        if entity.entity_type not in IDENTIFIER_TYPES:
+            continue
+        communication = [
+            event
+            for event in linked_events
+            if (event.event_type or "") in communication_types
+            and event.timestamp_normalized is not None
+        ]
+        communication.sort(key=lambda event: (_aware(event.timestamp_normalized), event.id))
+        if len(communication) < 2:
+            continue
+        span = abs(
+            (
+                _aware(communication[-1].timestamp_normalized)
+                - _aware(communication[0].timestamp_normalized)
+            ).total_seconds()
+        )
+        if span > temporal_window:
+            continue
+        source, target = _pair(communication[0], communication[-1])
+        supports = [
+            _support(event, "communication_sequence")
+            for event in communication[:8]
+        ]
+        _add(
+            db,
+            case_id=case_id,
+            source_type="event",
+            source_id=source.id,
+            target_type="event",
+            target_id=target.id,
+            relationship_type="communication_sequence",
+            correlation_rule="communication_sequence_same_identifier",
+            explanation=(
+                f"{len(communication)} communication events share "
+                f"{entity.entity_type} {entity.value_original!r} and occur within "
+                f"{span / 60:.1f} minutes. This is a hypothesis about sequence, not "
+                "proof of coordination, identity or causation."
+            ),
+            confidence="low",
+            classification="hypothesis",
+            metadata={
+                "engine": ENGINE_VERSION,
+                "entity_id": entity.id,
+                "entity_type": entity.entity_type,
+                "value": entity.value_original,
+                "event_types": sorted({event.event_type for event in communication}),
+                "span_seconds": round(span, 3),
+            },
+            supports=supports,
+            generated_keys=generated_keys,
+        )
+        relationship_count += 1
+        support_count += len(supports)
+
+    # F. Device/authentication context for a shared identifier.
+    for entity_id, linked_events in events_by_entity.items():
+        entity = entities[entity_id]
+        if entity.entity_type not in IDENTIFIER_TYPES:
+            continue
+        auth_events = [
+            event
+            for event in linked_events
+            if event.parser_name == "auth_log"
+            or (event.event_type or "").startswith(("auth", "ssh", "sudo"))
+        ]
+        device_events = [
+            event
+            for event in linked_events
+            if event.parser_name == "device_log" or event.event_type == "device_event"
+        ]
+        if not auth_events or not device_events:
+            continue
+        source, target = _pair(auth_events[0], device_events[0])
+        supports = [
+            _support(source, "authentication_context"),
+            _support(target, "device_context"),
+        ]
+        _add(
+            db,
+            case_id=case_id,
+            source_type="event",
+            source_id=source.id,
+            target_type="event",
+            target_id=target.id,
+            relationship_type="device_auth_context",
+            correlation_rule="device_auth_shared_identifier",
+            explanation=(
+                f"Authentication and device records both reference "
+                f"{entity.entity_type} {entity.value_original!r}. This links account "
+                "and device context but does not prove who operated the account."
+            ),
+            confidence="medium",
+            classification="correlation",
+            metadata={
+                "engine": ENGINE_VERSION,
+                "entity_id": entity.id,
+                "entity_type": entity.entity_type,
+                "value": entity.value_original,
+            },
+            supports=supports,
+            generated_keys=generated_keys,
+        )
+        relationship_count += 1
+        support_count += len(supports)
+
+    # G. Geo-velocity anomalies for consecutive documented fixes.
+    geo_velocity_limit = settings.correlation_geo_velocity_kmh
+    geo_pairs = 0
+    for entity_id, linked_events in events_by_entity.items():
+        entity = entities[entity_id]
+        if entity.entity_type not in {"device_id", "phone", "account"}:
+            continue
+        fixes: list[tuple[Event, tuple[float, float]]] = []
+        for event in linked_events:
+            attributes = event.attributes_json or {}
+            point = parse_coordinates(attributes.get("latitude"), attributes.get("longitude"))
+            if point is not None and event.timestamp_normalized is not None:
+                fixes.append((event, point))
+        fixes.sort(key=lambda item: (_aware(item[0].timestamp_normalized), item[0].id))
+        for (left, left_point), (right, right_point) in combinations(fixes, 2):
+            delta = abs(
+                (
+                    _aware(right.timestamp_normalized)
+                    - _aware(left.timestamp_normalized)
+                ).total_seconds()
+            )
+            if delta <= 0:
+                continue
+            distance = haversine_meters(left_point, right_point)
+            speed_kmh = (distance / 1000.0) / (delta / 3600.0)
+            if speed_kmh <= geo_velocity_limit:
+                continue
+            source, target = _pair(left, right)
+            supports = [
+                _support(source, "geo_velocity_anchor"),
+                _support(target, "geo_velocity_anomaly"),
+            ]
+            _add(
+                db,
+                case_id=case_id,
+                source_type="event",
+                source_id=source.id,
+                target_type="event",
+                target_id=target.id,
+                relationship_type="geo_velocity_anomaly",
+                correlation_rule="geo_velocity_above_threshold",
+                explanation=(
+                    f"Documented fixes for {entity.entity_type} "
+                    f"{entity.value_original!r} imply {speed_kmh:.0f} km/h over "
+                    f"{delta / 60:.1f} minutes ({distance:.0f} m), above the "
+                    f"{geo_velocity_limit:.0f} km/h review threshold. This is a "
+                    "hypothesis; timestamps or coordinates may be unreliable."
+                ),
+                confidence="low",
+                classification="hypothesis",
+                metadata={
+                    "engine": ENGINE_VERSION,
+                    "entity_id": entity.id,
+                    "entity_type": entity.entity_type,
+                    "value": entity.value_original,
+                    "speed_kmh": round(speed_kmh, 3),
+                    "distance_m": round(distance, 3),
+                    "delta_seconds": round(delta, 3),
+                    "threshold_kmh": geo_velocity_limit,
+                },
+                supports=supports,
+            generated_keys=generated_keys,
+            )
+            relationship_count += 1
+            support_count += len(supports)
+            geo_pairs += 1
+            if geo_pairs >= max_pairs:
+                break
+        if geo_pairs >= max_pairs:
+            break
+
+    # H. CCTV recording gaps for the same camera.
+    def _attribute_time(value: Any) -> datetime | None:
+        if not value:
+            return None
+        if isinstance(value, datetime):
+            return _aware(value)
+        text = str(value).strip().replace("Z", "+00:00")
+        try:
+            return _aware(datetime.fromisoformat(text))
+        except ValueError:
+            return None
+
+    cctv_by_camera: dict[str, list[Event]] = defaultdict(list)
+    for event in events:
+        if event.parser_name != "cctv" and event.event_type != "cctv_segment":
+            continue
+        attributes = event.attributes_json or {}
+        camera = attributes.get("camera_id") or attributes.get("site_name")
+        if camera:
+            cctv_by_camera[str(camera)].append(event)
+
+    cctv_gap_limit = max(1, settings.correlation_cctv_gap_minutes)
+    for camera, segments in cctv_by_camera.items():
+        segments.sort(
+            key=lambda event: (
+                _aware(event.timestamp_normalized) or datetime.min.replace(tzinfo=timezone.utc),
+                event.id,
+            )
+        )
+        for left, right in zip(segments, segments[1:]):
+            end = _attribute_time((left.attributes_json or {}).get("recording_end"))
+            start = _aware(right.timestamp_normalized)
+            if end is None or start is None:
+                continue
+            gap_minutes = (start - end).total_seconds() / 60.0
+            if gap_minutes <= cctv_gap_limit:
+                continue
+            source, target = _pair(left, right)
+            supports = [
+                _support(source, "cctv_coverage_end"),
+                _support(target, "cctv_coverage_start"),
+            ]
+            _add(
+                db,
+                case_id=case_id,
+                source_type="event",
+                source_id=source.id,
+                target_type="event",
+                target_id=target.id,
+                relationship_type="cctv_coverage_gap",
+                correlation_rule="cctv_recording_gap",
+                explanation=(
+                    f"Camera {camera!r} has a {gap_minutes:.0f}-minute gap between "
+                    f"recorded segments at {_locator(source)} and {_locator(target)}. "
+                    "This is a coverage hypothesis, not proof of missing activity."
+                ),
+                confidence="low",
+                classification="hypothesis",
+                metadata={
+                    "engine": ENGINE_VERSION,
+                    "camera": camera,
+                    "gap_minutes": round(gap_minutes, 3),
+                    "threshold_minutes": cctv_gap_limit,
+                },
+                supports=supports,
+            generated_keys=generated_keys,
+            )
+            relationship_count += 1
+            support_count += len(supports)
+
+    # Remove stale auto-generated, unreviewed relationships that this run did
+    # not reproduce. Reviewed or annotated relationships are never removed.
+    auto_types = {
+        "shared_identifier",
+        "co_mention",
+        "temporal_association",
+        "spatial_proximity",
+        "communication_sequence",
+        "device_auth_context",
+        "geo_velocity_anomaly",
+        "cctv_coverage_gap",
+    }
+    stale_removed = 0
+    candidates = list(
+        db.scalars(
+            select(Relationship).where(
+                Relationship.case_id == case_id,
+                Relationship.review_status == "unreviewed",
+                Relationship.relationship_type.in_(auto_types),
+            )
+        )
+    )
+    for relationship in candidates:
+        key = (
+            relationship.source_type,
+            relationship.source_id,
+            relationship.target_type,
+            relationship.target_id,
+            relationship.relationship_type,
+            relationship.correlation_rule,
+        )
+        if key in generated_keys:
+            continue
+        annotated = db.scalar(
+            select(InvestigatorAnnotation.id)
+            .where(
+                InvestigatorAnnotation.target_type == "relationship",
+                InvestigatorAnnotation.target_id == relationship.id,
+            )
+            .limit(1)
+        )
+        if annotated:
+            continue
+        db.delete(relationship)
+        stale_removed += 1
+
     db.flush()
+    return {
+        "relationships": relationship_count,
+        "relationship_supports": support_count,
+        "stale_relationships_removed": stale_removed,
+    }
     return {
         "relationships": relationship_count,
         "relationship_supports": support_count,

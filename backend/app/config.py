@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     correlation_spatial_radius_m: int = 500
     correlation_spatial_window_minutes: int = 60
     correlation_max_pairs_per_identifier: int = 50
+    correlation_geo_velocity_kmh: float = 200.0
+    correlation_cctv_gap_minutes: int = 5
 
     ai_provider: str = "auto"
     ai_timeout_seconds: float = 60.0

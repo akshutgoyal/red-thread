@@ -5,7 +5,15 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from ..models import Case, InvestigatorAnnotation, Relationship, RelationshipSupport, ReviewDecision
+from ..models import (
+    Case,
+    Event,
+    GraphEdge,
+    InvestigatorAnnotation,
+    Relationship,
+    RelationshipSupport,
+    ReviewDecision,
+)
 from ..schemas.relationship import AnnotationCreate
 from . import audit_service
 
@@ -29,6 +37,82 @@ def _relationship_query(case_id: str):
 
 def _with_supports(query):
     return query.options(selectinload(Relationship.supports))
+
+
+def backfill_legacy_graph_edges(
+    db: Session,
+    *,
+    case_id: str | None = None,
+) -> dict[str, int]:
+    """Materialize legacy GraphEdge rows as provenance-backed relationships.
+
+    The operation is idempotent: the relationship unique key prevents duplicate
+    rows, and support rows are rebuilt from the legacy edge each run.
+    """
+
+    query = select(GraphEdge).order_by(GraphEdge.created_at.asc())
+    if case_id:
+        query = query.where(GraphEdge.case_id == case_id)
+    edges = list(db.scalars(query))
+    relationships = 0
+    supports = 0
+    for edge in edges:
+        event_ids = edge.supporting_event_ids_json or []
+        evidence_ids = edge.supporting_evidence_ids_json or []
+        events = (
+            list(db.scalars(select(Event).where(Event.id.in_(event_ids))))
+            if event_ids
+            else []
+        )
+        event_evidence_ids = {event.evidence_id for event in events if event.evidence_id}
+        support_rows: list[dict[str, Any]] = [
+            {
+                "evidence_id": event.evidence_id,
+                "event_id": event.id,
+                "source_locator": event.source_locator,
+                "snippet": event.source_snippet[:800],
+                "support_kind": "legacy_graph_edge",
+            }
+            for event in events
+        ]
+        for evidence_id in sorted(set(evidence_ids) - event_evidence_ids):
+            support_rows.append(
+                {
+                    "evidence_id": evidence_id,
+                    "event_id": None,
+                    "source_locator": "",
+                    "snippet": "Support inherited from the legacy graph edge.",
+                    "support_kind": "legacy_graph_edge",
+                }
+            )
+        classification = (
+            "hypothesis"
+            if any(token in edge.edge_type for token in ("temporal", "proximity"))
+            else "correlation"
+        )
+        upsert_relationship(
+            db,
+            case_id=edge.case_id,
+            source_type=edge.source_type,
+            source_id=edge.source_id,
+            target_type=edge.target_type,
+            target_id=edge.target_id,
+            relationship_type=edge.edge_type,
+            correlation_rule=edge.match_method or "legacy_graph_edge",
+            explanation=edge.explanation,
+            confidence=edge.confidence,
+            classification=classification,
+            metadata={
+                "legacy_graph_edge_id": edge.id,
+                "backfill": "legacy_graph_edge",
+            },
+            supports=support_rows,
+            commit=False,
+        )
+        relationships += 1
+        supports += len(support_rows)
+    db.commit()
+    return {"relationships": relationships, "supports": supports}
 
 
 def list_relationships(
