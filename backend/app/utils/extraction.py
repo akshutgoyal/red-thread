@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 import re
 
 from .amounts import extract_amounts
@@ -17,6 +18,8 @@ UTR_RE = re.compile(r"(?i)\butr\b[^\d]{0,20}(\d{12})")
 TXN_RE = re.compile(r"\b(?:TXN|UPI|TXNID)[-: ]?[A-Z0-9]{6,}\b", re.IGNORECASE)
 INVOICE_RE = re.compile(r"\bINV[-/ ]?\d{4}[-/ ]?\d+\b", re.IGNORECASE)
 URL_RE = re.compile(r"https?://[^\s<>\"')]+", re.IGNORECASE)
+IP_RE = re.compile(r"(?<![\w:])(?:\d{1,3}\.){3}\d{1,3}(?![\w:])")
+MAC_RE = re.compile(r"\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b")
 ACCOUNT_RE = re.compile(
     r"(?i)(?:a/c|account|acct)[^\d]{0,10}(\d{9,18})"
 )
@@ -68,6 +71,16 @@ def extract_entities(text: str, *, default_role: str = "mentioned") -> list[tupl
 
     for match in URL_RE.finditer(text):
         _append_unique(results, seen, ("url", match.group(0), default_role))
+
+    for match in IP_RE.finditer(text):
+        try:
+            value = str(ipaddress.ip_address(match.group(0)))
+        except ValueError:
+            continue
+        _append_unique(results, seen, ("ip", value, default_role))
+
+    for match in MAC_RE.finditer(text):
+        _append_unique(results, seen, ("mac", match.group(0).upper(), default_role))
 
     for match in ACCOUNT_RE.finditer(text):
         _append_unique(results, seen, ("account", match.group(1), default_role))

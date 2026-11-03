@@ -114,6 +114,18 @@ def _parse_text(path: Path, context: ParserContext) -> ParseResult:
 
 
 def _rows(path: Path) -> list[dict]:
+    if path.suffix.lower() == ".jsonl":
+        rows: list[dict] = []
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            if not line.strip():
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(payload, dict):
+                rows.append(payload)
+        return rows
     payload = json.loads(path.read_text(encoding="utf-8", errors="replace"))
     if isinstance(payload, list):
         return [row for row in payload if isinstance(row, dict)]
@@ -204,6 +216,6 @@ class ChatParser(BaseParser):
     supported_extensions = (".txt", ".json", ".jsonl")
 
     def parse(self, path: Path, context: ParserContext) -> ParseResult:
-        if path.suffix.lower() == ".json":
+        if path.suffix.lower() in {".json", ".jsonl"}:
             return _parse_json(path, context)
         return _parse_text(path, context)

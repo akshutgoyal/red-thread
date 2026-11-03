@@ -47,6 +47,8 @@ EVIDENCE_SUFFIXES = {
     ".png",
     ".jpg",
     ".jpeg",
+    ".gpx",
+    ".kml",
 }
 SKIP_NAMES = {"readme.md", "manifest.json"}
 

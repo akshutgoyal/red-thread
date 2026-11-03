@@ -20,7 +20,7 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/Table";
 import { copyText, formatBytes, humanize, shortHash } from "@/lib/format";
 import type { Evidence, ParseResponse } from "@/types";
 
-const SUPPORTED = [".csv", ".json", ".jsonl", ".txt", ".log", ".pdf", ".eml", ".png", ".jpg", ".jpeg"];
+const SUPPORTED = [".csv", ".json", ".jsonl", ".txt", ".log", ".pdf", ".eml", ".png", ".jpg", ".jpeg", ".gpx", ".kml"];
 const MAX_MB = 50;
 
 interface UploadResult {

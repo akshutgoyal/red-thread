@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from ..utils.geo import format_gps_point, parse_coordinates
 from ..utils.timestamps import parse_flexible_timestamp
 from .base import (
     BaseParser,
@@ -21,6 +22,9 @@ TIMESTAMP_ALIASES = ("timestamp_raw", "timestamp", "datetime", "date_time", "cal
 DURATION_ALIASES = ("duration_sec", "duration_seconds", "duration", "call_duration")
 STATUS_ALIASES = ("call_type", "call_status", "status", "type")
 TOWER_ALIASES = ("cell_tower_id", "cell_tower", "tower", "location", "cell_id")
+DEVICE_ALIASES = ("device_id", "device", "source_device", "handset_id", "imei")
+LAT_ALIASES = ("latitude", "lat", "tower_latitude", "cell_latitude")
+LON_ALIASES = ("longitude", "lon", "lng", "tower_longitude", "cell_longitude")
 
 
 def _normalized_row(row: dict) -> dict:
@@ -72,6 +76,11 @@ class CallLogParser(BaseParser):
             duration_raw, _ = _pick(row, DURATION_ALIASES)
             status, _ = _pick(row, STATUS_ALIASES)
             tower, _ = _pick(row, TOWER_ALIASES)
+            device_id, _ = _pick(row, DEVICE_ALIASES)
+            coordinates = parse_coordinates(
+                _pick(row, LAT_ALIASES)[0], _pick(row, LON_ALIASES)[0]
+            )
+            point = format_gps_point(*coordinates) if coordinates else None
 
             locator = f"row:{index + 2}" if path.suffix.lower() == ".csv" else f"record:{index}"
             if not timestamp_raw:
@@ -97,6 +106,10 @@ class CallLogParser(BaseParser):
                 entities.append(EntityDraft("phone", receiver, "receiver", receiver))
             if tower:
                 entities.append(EntityDraft("cell_tower", tower, "cell_tower", tower))
+            if device_id:
+                entities.append(EntityDraft("device_id", device_id, "device", device_id))
+            if point:
+                entities.append(EntityDraft("gps_point", point, "tower_location", point))
 
             attributes = {
                 "caller": caller,
@@ -104,6 +117,11 @@ class CallLogParser(BaseParser):
                 "duration_sec": int(duration_raw) if duration_raw and duration_raw.isdigit() else duration_raw,
                 "call_type": status,
                 "cell_tower_id": tower,
+                "device_id": device_id,
+                "latitude": coordinates[0] if coordinates else None,
+                "longitude": coordinates[1] if coordinates else None,
+                "gps_point": point,
+                "coordinate_source": "call_tower" if coordinates else None,
                 "timestamp_basis": timestamp.basis,
             }
             events.append(

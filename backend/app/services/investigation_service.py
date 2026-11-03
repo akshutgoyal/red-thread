@@ -26,7 +26,7 @@ def _parser_context(evidence: Evidence, parser_name: str) -> ParserContext:
         evidence_id=evidence.id,
         source_filename=evidence.original_filename,
         reference_date=evidence.uploaded_at or datetime.now(timezone.utc),
-        default_year=settings.auth_default_year,
+        default_year=settings.auth_default_year if parser_name == "auth_log" else None,
         timezone=timezone,
     )
 

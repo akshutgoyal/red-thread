@@ -20,6 +20,7 @@ from .base import (
 def _attributes(event) -> dict:
     return {
         **event.attributes,
+        "event_id": event.event_id,
         "source_ip": event.source_ip,
         "username": event.username,
         "host": event.host,

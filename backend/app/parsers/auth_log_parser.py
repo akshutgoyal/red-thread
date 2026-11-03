@@ -448,9 +448,12 @@ def parse_timestamp(raw: str, config: AuthParserConfig) -> TimestampResult:
 # Line patterns
 # ---------------------------------------------------------------------------
 
-_TS = r"(?P<timestamp>[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})"
+_TS = (
+    r"(?P<timestamp>(?:[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}"
+    r"|\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?))"
+)
 _HOST = r"(?P<host>\S+)"
-_SSHD = r"sshd\[(?P<pid>\d+)\]:"
+_SSHD = r"sshd(?:-session)?\[(?P<pid>\d+)\]:"
 _IP = r"(?P<ip>[0-9A-Fa-f:.]+)"
 
 SSH_LOGIN_RE = re.compile(
@@ -536,6 +539,9 @@ def parse_line(
     stripped = raw_line.strip()
     if not stripped:
         return None
+    rfc5424 = re.match(r"^<\d+>\d+\s+(.*)$", stripped)
+    if rfc5424:
+        stripped = rfc5424.group(1)
 
     def build_event(
         *,

@@ -6,9 +6,12 @@ from pathlib import Path
 from .auth_adapter import AuthLogParser
 from .base import BaseParser
 from .call_log_parser import CallLogParser
+from .cctv_parser import CctvParser
 from .chat_parser import ChatParser
+from .device_log_parser import DeviceLogParser
 from .email_parser import EmailParser
 from .generic_parser import GenericCsvParser, GenericJsonParser, GenericTextParser
+from .gps_parser import GpsParser
 from .image_parser import ImageParser
 from .invoice_parser import InvoiceParser
 from .transaction_parser import TransactionParser
@@ -20,6 +23,9 @@ PARSERS: list[BaseParser] = [
     TransactionParser(),
     InvoiceParser(),
     EmailParser(),
+    GpsParser(),
+    CctvParser(),
+    DeviceLogParser(),
     ImageParser(),
     GenericCsvParser(),
     GenericJsonParser(),
@@ -43,6 +49,15 @@ HINTS = {
     "receipt": "invoice",
     "email": "email",
     "eml": "email",
+    "gps": "gps",
+    "gpx": "gps",
+    "kml": "gps",
+    "location": "gps",
+    "cctv": "cctv",
+    "camera": "cctv",
+    "device": "device_log",
+    "device_log": "device_log",
+    "imei": "device_log",
     "image": "image",
     "ocr": "image",
     "text": "generic_text",
@@ -52,8 +67,10 @@ HINTS = {
 
 SUPPORTED_DESCRIPTION = (
     "Authentication logs (.log/.txt), call logs (.csv/.json), chat exports "
-    "(.txt/.json), transaction records (.csv/.json), invoices (.pdf/.csv/.json), "
-    "email (.eml), images (.png/.jpg/.jpeg), and generic text/CSV/JSON."
+    "(.txt/.json/.jsonl), email records (.eml/.csv), GPS tracks "
+    "(.csv/.json/.gpx/.kml), CCTV metadata (.csv/.json), device logs "
+    "(.csv/.json/.jsonl), transaction records (.csv/.json), invoices "
+    "(.pdf/.csv/.json), images (.png/.jpg/.jpeg), and generic text/CSV/JSON."
 )
 
 
@@ -68,6 +85,16 @@ def _csv_header(path: Path) -> str:
 
 def _detect_csv(path: Path) -> BaseParser:
     header = _csv_header(path)
+    if (
+        any(token in header for token in ("from", "sender"))
+        and any(token in header for token in ("to", "recipient"))
+        and any(token in header for token in ("subject", "body", "message_id"))
+    ):
+        return PARSER_BY_NAME["email"]
+    if any(token in header for token in ("latitude", "longitude", "gps_lat", "gps_lon")):
+        return PARSER_BY_NAME["gps"]
+    if any(token in header for token in ("camera_id", "cctv", "recording_start", "recording_end")):
+        return PARSER_BY_NAME["cctv"]
     if any(token in header for token in ("caller", "receiver", "call_type", "duration")):
         return PARSER_BY_NAME["call_log"]
     if any(token in header for token in ("utr", "payee", "payer", "transaction", "amount")):
@@ -76,11 +103,17 @@ def _detect_csv(path: Path) -> BaseParser:
         return PARSER_BY_NAME["invoice"]
     if any(token in header for token in ("sender", "message", "recipient")):
         return PARSER_BY_NAME["chat"]
+    if any(token in header for token in ("device_id", "imei", "imsi", "mac_address")):
+        return PARSER_BY_NAME["device_log"]
     return PARSER_BY_NAME["generic_csv"]
 
 
 def _detect_json(path: Path) -> BaseParser:
     head = _read_head(path, 8192).lower()
+    if '"latitude"' in head and '"longitude"' in head:
+        return PARSER_BY_NAME["gps"]
+    if '"camera_id"' in head or '"recording_start"' in head:
+        return PARSER_BY_NAME["cctv"]
     if '"caller"' in head or '"receiver"' in head:
         return PARSER_BY_NAME["call_log"]
     if '"utr"' in head or '"payee"' in head or '"transaction_id"' in head:
@@ -89,6 +122,8 @@ def _detect_json(path: Path) -> BaseParser:
         return PARSER_BY_NAME["invoice"]
     if '"sender"' in head or '"message"' in head:
         return PARSER_BY_NAME["chat"]
+    if '"device_id"' in head or '"imei"' in head or '"imsi"' in head:
+        return PARSER_BY_NAME["device_log"]
     return PARSER_BY_NAME["generic_json"]
 
 
@@ -122,10 +157,20 @@ def detect_parser(path: Path, filename: str | None = None, hint: str | None = No
 
     if suffix == ".eml":
         return PARSER_BY_NAME["email"]
+    if suffix in {".gpx", ".kml"}:
+        return PARSER_BY_NAME["gps"]
     if suffix in {".png", ".jpg", ".jpeg"}:
         return PARSER_BY_NAME["image"]
     if "auth" in name or suffix == ".log":
         return PARSER_BY_NAME["auth_log"]
+    if any(token in name for token in ("gps", "location_track", "geotrack")):
+        return PARSER_BY_NAME["gps"]
+    if any(token in name for token in ("cctv", "camera")):
+        return PARSER_BY_NAME["cctv"]
+    if any(token in name for token in ("device_log", "device-events", "imei", "handset")):
+        return PARSER_BY_NAME["device_log"]
+    if "email" in name:
+        return PARSER_BY_NAME["email"]
     if "call" in name:
         return PARSER_BY_NAME["call_log"]
     if any(token in name for token in ("transaction", "upi", "bank", "ledger", "statement")):

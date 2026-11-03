@@ -28,6 +28,28 @@ def normalize_entity(entity_type: str, value: str) -> tuple[str, str]:
         except ValueError:
             return raw, "raw"
 
+    if kind == "mac":
+        compact = re.sub(r"[^0-9A-Fa-f]", "", raw).upper()
+        if len(compact) == 12:
+            normalized = ":".join(compact[index : index + 2] for index in range(0, 12, 2))
+            return normalized, "mac_canonical"
+        return raw, "raw"
+
+    if kind in {"device_id", "camera_id"}:
+        return re.sub(r"\s+", "", raw).upper(), "strip_upper"
+
+    if kind in {"imei", "imsi"}:
+        compact = re.sub(r"[^0-9]", "", raw)
+        if compact:
+            return compact, "digits_only"
+        return raw.upper(), "raw"
+
+    if kind == "gps_point":
+        return re.sub(r"\s+", "", raw), "coordinate_pair"
+
+    if kind == "place_label":
+        return raw.lower(), "lowercase"
+
     if kind in {"username", "host", "account"}:
         return raw, "raw"
 

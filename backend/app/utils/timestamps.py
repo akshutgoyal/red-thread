@@ -75,9 +75,10 @@ def parse_flexible_timestamp(
     if default_year is not None and not year_present:
         reference = reference.replace(year=default_year)
 
-    # Detect an explicit timezone abbreviation at the end.
+    # Detect an explicit timezone abbreviation, UTC marker, or numeric offset.
     timezone_assumed = True
     timezone_name: str | None = default_timezone
+    offset_match = re.search(r"([+-]\d{2}:?\d{2})$", text)
     tz_match = re.search(r"\b([A-Z]{2,4})$", text)
     if tz_match and tz_match.group(1) in TZ_ALIASES:
         timezone_name = tz_match.group(1)
@@ -85,6 +86,9 @@ def parse_flexible_timestamp(
         text = text[: tz_match.start()].strip().rstrip(",")
     elif text.endswith("Z"):
         timezone_name = "UTC"
+        timezone_assumed = False
+    elif offset_match:
+        timezone_name = offset_match.group(1)
         timezone_assumed = False
 
     # ISO 8601 dates start with a four-digit year and must be parsed
@@ -116,11 +120,8 @@ def parse_flexible_timestamp(
             f"Timezone not present in source timestamp; interpreted as {default_timezone}."
         )
     else:
-        timezone_name = getattr(parsed.tzinfo, "key", None) or str(parsed.tzinfo)
-        if timezone_assumed is False:
-            timezone_name = tz_match.group(1) if tz_match else "UTC"
-        else:
-            timezone_name = str(parsed.tzinfo)
+        if timezone_assumed or not timezone_name:
+            timezone_name = getattr(parsed.tzinfo, "key", None) or str(parsed.tzinfo)
 
     normalized = parsed.astimezone(timezone.utc)
 
