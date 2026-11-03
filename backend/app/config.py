@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     default_timezone: str = "Asia/Kolkata"
     auth_default_year: int | None = None
 
+    correlation_temporal_window_minutes: int = 60
+    correlation_spatial_radius_m: int = 500
+    correlation_spatial_window_minutes: int = 60
+    correlation_max_pairs_per_identifier: int = 50
+
     ai_provider: str = "auto"
     ai_timeout_seconds: float = 60.0
     ai_max_retries: int = 2

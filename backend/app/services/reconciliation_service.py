@@ -20,7 +20,7 @@ from ..models import (
 )
 from ..utils.amounts import extract_amounts, normalize_amount, parse_amount
 from ..utils.extraction import UTR_RE, extract_entities
-from . import audit_service
+from . import audit_service, relationship_engine
 
 RECONCILIATION_METHOD = "deterministic_reconciliation"
 SHARED_IDENTIFIER_TYPES = {
@@ -756,6 +756,7 @@ def run(db: Session, case_id: str) -> list[Finding]:
     findings.extend(_check_invoice_vs_transaction(db, case_id, events))
     findings.extend(_check_shared_identifiers(db, case_id, events))
     findings.extend(_check_timestamp_quality(db, case_id, events))
+    relationship_summary = relationship_engine.build_case_relationships(db, case_id)
     audit_service.record(
         db,
         case_id,
@@ -763,6 +764,7 @@ def run(db: Session, case_id: str) -> list[Finding]:
         details={
             "findings_created": len(findings),
             "event_types": {key: len(value) for key, value in events.items()},
+            **relationship_summary,
         },
     )
     db.flush()

@@ -109,6 +109,7 @@ def upsert_relationship(
     classification: str = "correlation",
     metadata: dict[str, Any] | None = None,
     supports: list[dict[str, Any]] | None = None,
+    commit: bool = True,
 ) -> Relationship:
     """Create or update a data-derived relationship and its provenance."""
 
@@ -172,8 +173,11 @@ def upsert_relationship(
             "support_count": len(relationship.supports),
         },
     )
-    db.commit()
-    db.refresh(relationship)
+    if commit:
+        db.commit()
+        db.refresh(relationship)
+    else:
+        db.flush()
     return relationship
 
 
