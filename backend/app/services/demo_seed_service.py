@@ -34,6 +34,15 @@ DEMO_CASES: list[dict[str, str]] = [
             "test data and are not real evidence."
         ),
     },
+    {
+        "title": "Operation Digital Trail (Synthetic Demo)",
+        "directory": "operation_digital_trail",
+        "description": (
+            "Synthetic PS3 demonstration with call, chat, email, GPS, CCTV, "
+            "authentication and device records. All records are fictional and "
+            "correlations are investigative leads, not proof."
+        ),
+    },
 ]
 
 EVIDENCE_SUFFIXES = {

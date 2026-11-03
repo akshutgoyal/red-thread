@@ -4,7 +4,7 @@ import networkx as nx
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from ..models import Event, EventEntity, Evidence, GraphEdge
+from ..models import Event, EventEntity, Evidence, GraphEdge, Relationship
 from ..schemas.event import GraphEdgeRead, GraphNodeRead, GraphResponse
 
 
@@ -128,6 +128,57 @@ def build_graph(
             persisted_edge_id=edge.id,
         )
 
+    provenance_relationships = list(
+        db.scalars(
+            select(Relationship)
+            .where(Relationship.case_id == case_id)
+            .options(selectinload(Relationship.supports))
+            .order_by(Relationship.created_at.asc())
+        )
+    )
+    for relation in provenance_relationships:
+        source_id = f"{relation.source_type}:{relation.source_id}"
+        target_id = f"{relation.target_type}:{relation.target_id}"
+        for node_id, node_type in (
+            (source_id, relation.source_type),
+            (target_id, relation.target_type),
+        ):
+            if node_id not in graph:
+                graph.add_node(
+                    node_id,
+                    label=node_id.split(":", 1)[-1],
+                    node_type=node_type,
+                    data={},
+                )
+        graph.add_edge(
+            source_id,
+            target_id,
+            edge_type=relation.relationship_type,
+            match_method=relation.correlation_rule,
+            explanation=relation.explanation,
+            confidence=relation.confidence,
+            supporting_event_ids=sorted(
+                {
+                    support.event_id
+                    for support in relation.supports
+                    if support.event_id
+                }
+            ),
+            supporting_evidence_ids=sorted(
+                {
+                    support.evidence_id
+                    for support in relation.supports
+                    if support.evidence_id
+                }
+            ),
+            persisted_edge_id=f"relationship:{relation.id}",
+            relationship_id=relation.id,
+            relationship_type=relation.relationship_type,
+            correlation_rule=relation.correlation_rule,
+            classification=relation.classification,
+            review_status=relation.review_status,
+        )
+
     if include_temporal:
         timed = [event for event in events if event.timestamp_normalized is not None]
         temporal_count = 0
@@ -190,6 +241,11 @@ def build_graph(
                 confidence=data.get("confidence", "medium"),
                 supporting_event_ids=data.get("supporting_event_ids", []),
                 supporting_evidence_ids=data.get("supporting_evidence_ids", []),
+                relationship_id=data.get("relationship_id"),
+                relationship_type=data.get("relationship_type"),
+                correlation_rule=data.get("correlation_rule"),
+                classification=data.get("classification"),
+                review_status=data.get("review_status"),
             )
         )
     return GraphResponse(nodes=nodes, edges=edges)

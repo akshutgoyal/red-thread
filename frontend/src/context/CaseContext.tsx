@@ -35,7 +35,9 @@ export function CaseProvider({ children }: { children: ReactNode }) {
     // active case to null and then to the preferred case when the query resolves.
     if (isLoading) return;
     const preferredCase =
-      cases.find((item) => item.title.toLowerCase().includes("phishtrace")) ?? cases[0];
+      cases.find((item) => item.title.toLowerCase().includes("digital trail")) ??
+      cases.find((item) => item.title.toLowerCase().includes("phishtrace")) ??
+      cases[0];
     if (selectedCaseId && !cases.some((item) => item.id === selectedCaseId)) {
       setSelectedCaseIdState(preferredCase?.id ?? null);
     } else if (!selectedCaseId && cases.length > 0) {

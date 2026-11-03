@@ -6,8 +6,11 @@ import {
   GitBranch,
   LayoutDashboard,
   ListChecks,
+  Map,
   ScrollText,
+  Search,
   ShieldCheck,
+  Sparkles,
   UploadCloud,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
@@ -26,10 +29,13 @@ const caseItems = [
   { suffix: "", label: "Case overview", icon: Activity, end: true },
   { suffix: "/evidence", label: "Evidence vault", icon: FileSearch },
   { suffix: "/evidence/intake", label: "Evidence intake", icon: UploadCloud },
-  { suffix: "/auth", label: "Auth analysis", icon: ShieldCheck },
-  { suffix: "/timeline", label: "Timeline", icon: ScrollText },
+  { suffix: "/entities", label: "Entity explorer", icon: Search },
   { suffix: "/graph", label: "Relationship graph", icon: GitBranch },
+  { suffix: "/timeline", label: "Timeline", icon: ScrollText },
+  { suffix: "/spatial", label: "Spatial reconstruction", icon: Map },
+  { suffix: "/auth", label: "Auth analysis", icon: ShieldCheck },
   { suffix: "/findings", label: "Findings", icon: ListChecks },
+  { suffix: "/reconstruction", label: "Reconstruction", icon: Sparkles },
   { suffix: "/ai", label: "AI assistant", icon: Bot },
   { suffix: "/reports", label: "Reports", icon: FileSearch },
 ];

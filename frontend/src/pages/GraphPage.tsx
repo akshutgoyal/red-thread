@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
 import { Select } from "@/components/ui/Field";
+import { RelationshipEvidencePanel } from "@/components/relationship/RelationshipEvidencePanel";
 import { cn } from "@/lib/cn";
 import { useTheme } from "@/theme/ThemeContext";
 
@@ -129,6 +130,11 @@ export function GraphPage() {
           match_method: edge.match_method,
           explanation: edge.explanation,
           confidence: edge.confidence,
+          relationship_id: edge.relationship_id ?? undefined,
+          relationship_type: edge.relationship_type ?? undefined,
+          correlation_rule: edge.correlation_rule ?? undefined,
+          classification: edge.classification ?? undefined,
+          review_status: edge.review_status ?? undefined,
           line_style: edge.match_method === "heuristic" ? "dashed" : "solid",
         },
       }));
@@ -223,6 +229,12 @@ export function GraphPage() {
                 <p className="text-xs text-muted">
                   Select a node or edge to inspect its explanation and supporting records.
                 </p>
+              ) : selected.kind === "edge" &&
+                typeof selected.data.relationship_id === "string" ? (
+                <RelationshipEvidencePanel
+                  caseId={caseId}
+                  relationshipId={selected.data.relationship_id}
+                />
               ) : (
                 <div className="space-y-3">
                   <Badge className="border-accent/30 bg-accent/10 text-accent">
@@ -355,6 +367,41 @@ function CytoscapeCanvas({
             "target-arrow-shape": "triangle",
             "curve-style": "bezier",
             opacity: 0.8,
+          },
+        },
+        {
+          selector: 'edge[relationship_type = "shared_identifier"]',
+          style: {
+            width: 2.4,
+            "line-color": palette.exact,
+            "target-arrow-color": palette.exact,
+          },
+        },
+        {
+          selector: 'edge[relationship_type = "co_mention"]',
+          style: {
+            width: 1.6,
+            "line-style": "dashed",
+            "line-color": palette.heuristic,
+            "target-arrow-color": palette.heuristic,
+          },
+        },
+        {
+          selector: 'edge[relationship_type = "temporal_association"]',
+          style: {
+            width: 1.5,
+            "line-style": "dashed",
+            "line-color": palette.heuristic,
+            "target-arrow-color": palette.heuristic,
+          },
+        },
+        {
+          selector: 'edge[relationship_type = "spatial_proximity"]',
+          style: {
+            width: 2,
+            "line-style": "dotted",
+            "line-color": palette.heuristic,
+            "target-arrow-color": palette.heuristic,
           },
         },
         {

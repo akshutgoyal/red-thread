@@ -24,10 +24,11 @@ interface ChatMessage {
 }
 
 const SUGGESTIONS = [
-  "Summarize the evidence in this case without drawing conclusions.",
-  "Explain the amount discrepancy between the screenshot and the transaction ledger.",
-  "Which identifiers appear in more than one evidence source?",
-  "What investigative questions remain unanswered by the current evidence?",
+  "Which evidence sources mention the same phone number or device?",
+  "Which relationships are exact matches, and which are temporal or spatial leads?",
+  "Explain the event sequence around the documented locations without drawing conclusions.",
+  "What evidence is missing to connect the authenticated account to the device?",
+  "Summarize the investigation and separate observations from hypotheses.",
 ];
 
 export function AiAssistantPage() {

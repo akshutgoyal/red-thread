@@ -12,10 +12,10 @@ from urllib.parse import urlparse
 import httpx
 from fastapi import HTTPException
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..config import Settings
-from ..models import AiQuery, Case, Event, Evidence, Finding, FindingEvidence
+from ..models import AiQuery, Case, Event, Evidence, Finding, FindingEvidence, Relationship
 from ..utils.extraction import extract_entities
 from . import audit_service
 
@@ -40,15 +40,15 @@ Strict rules:
 {
   "answer": "clear, evidence-grounded answer",
   "citations": [
-    {"kind": "evidence|event|finding", "id": "stored record ID", "source_locator": "optional locator"}
+    {"kind": "evidence|event|finding|relationship", "id": "stored record ID", "source_locator": "optional locator"}
   ],
   "uncertainties": ["..."],
   "alternative_explanations": ["..."],
   "suggested_next_steps": ["..."],
   "insufficient_evidence": false
 }
-8. Mention an evidence, event, or finding ID in the answer only if that exact ID also appears
-   in the citations array. Do not discuss unrelated or uncited IDs.
+8. Mention an evidence, event, finding, or relationship ID in the answer only if that exact ID
+   also appears in the citations array. Do not discuss unrelated or uncited IDs.
 9. Keep the answer clean and direct. Do not add a separate inventory of every record inspected.
 Do not wrap the JSON in Markdown fences."""
 
@@ -464,6 +464,15 @@ def _build_context(
             .limit(80)
         )
     )
+    relationships = list(
+        db.scalars(
+            select(Relationship)
+            .where(Relationship.case_id == case.id)
+            .options(selectinload(Relationship.supports))
+            .order_by(Relationship.created_at.desc())
+            .limit(100)
+        )
+    )
     terms, entity_values = _question_terms(question)
 
     def score_event(event: Event) -> int:
@@ -565,6 +574,40 @@ def _build_context(
             }
             for finding in findings
         ],
+        "relationships": [
+            {
+                "id": relationship.id,
+                "source_type": relationship.source_type,
+                "source_id": relationship.source_id,
+                "target_type": relationship.target_type,
+                "target_id": relationship.target_id,
+                "relationship_type": relationship.relationship_type,
+                "correlation_rule": relationship.correlation_rule,
+                "explanation": (
+                    _redact_value(relationship.explanation or "")
+                    if settings.ai_redact_pii
+                    else (relationship.explanation or "")
+                )[:1200],
+                "confidence": relationship.confidence,
+                "classification": relationship.classification,
+                "review_status": relationship.review_status,
+                "supports": [
+                    {
+                        "evidence_id": support.evidence_id,
+                        "event_id": support.event_id,
+                        "source_locator": support.source_locator,
+                        "snippet": (
+                            _redact_value(support.snippet or "")
+                            if settings.ai_redact_pii
+                            else (support.snippet or "")
+                        )[:500],
+                        "support_kind": support.support_kind,
+                    }
+                    for support in relationship.supports
+                ],
+            }
+            for relationship in relationships
+        ],
     }
 
     context_json = json.dumps(context, ensure_ascii=False, default=str)
@@ -573,6 +616,8 @@ def _build_context(
             context["events"].pop()
         elif len(context["findings"]) > 10:
             context["findings"].pop()
+        elif len(context["relationships"]) > 20:
+            context["relationships"].pop()
         else:
             break
         context_json = json.dumps(context, ensure_ascii=False, default=str)
@@ -581,6 +626,7 @@ def _build_context(
         "evidence": {item.id for item in evidence},
         "event": {item["id"] for item in context["events"]},
         "finding": {item["id"] for item in context["findings"]},
+        "relationship": {item["id"] for item in context["relationships"]},
     }
     context_maps: dict[str, Any] = {
         "event_locator": {
@@ -588,11 +634,18 @@ def _build_context(
         },
         "evidence_locators": {},
         "finding_locators": {},
+        "relationship_locators": {},
     }
     for event in all_events:
         context_maps["evidence_locators"].setdefault(event.evidence_id, set()).add(
             event.source_locator
         )
+    for relationship in relationships:
+        for support in relationship.supports:
+            if support.source_locator:
+                context_maps["relationship_locators"].setdefault(
+                    relationship.id, set()
+                ).add(_normalize_locator(support.source_locator))
     finding_ids = [finding.id for finding in findings]
     if finding_ids:
         links = list(
@@ -748,6 +801,26 @@ def _validate_citations(
                 verified, warning = _check_locator(
                     source_locator, allowed, "finding"
                 )
+        elif kind == "relationship":
+            record = db.get(Relationship, citation_id)
+            if record is None or record.case_id != case_id:
+                warning = "Cited relationship ID does not belong to this case."
+            elif citation_id not in context_ids["relationship"]:
+                warning = "Relationship exists but was not in the retrieved context."
+            else:
+                label = record.relationship_type
+                allowed = {
+                    _normalize_locator(locator)
+                    for locator in context_maps.get("relationship_locators", {}).get(
+                        record.id, set()
+                    )
+                    if locator
+                }
+                verified, warning = _check_locator(
+                    source_locator, allowed, "relationship"
+                )
+                if record.supports:
+                    evidence_id = record.supports[0].evidence_id
         else:
             warning = "Unknown citation kind."
 

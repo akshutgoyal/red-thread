@@ -3,6 +3,7 @@ import type {
   AiStatus,
   AuditEvent,
   CaseSummary,
+  EntityDetail,
   EntityRecord,
   EventListResponse,
   Evidence,
@@ -12,7 +13,11 @@ import type {
   HashVerifyResponse,
   Health,
   ParseResponse,
+  ReconstructionResponse,
+  RelationshipDetail,
+  RelationshipListResponse,
   ReportRecord,
+  SpatialResponse,
   TimelineResponse,
 } from "@/types";
 
@@ -157,6 +162,40 @@ export const api = {
       `/cases/${caseId}/entities${query({ entity_type: entityType })}`,
       { caseId },
     ),
+  getEntityDetail: (caseId: string, entityId: string) =>
+    request<EntityDetail>(`/cases/${caseId}/entities/${entityId}`, { caseId }),
+  listRelationships: (
+    caseId: string,
+    params: {
+      relationship_type?: string;
+      classification?: string;
+      review_status?: string;
+      confidence?: string;
+      limit?: number;
+    } = {},
+  ) =>
+    request<RelationshipListResponse>(
+      `/cases/${caseId}/relationships${query(params)}`,
+      { caseId },
+    ),
+  getRelationship: (caseId: string, relationshipId: string) =>
+    request<RelationshipDetail>(
+      `/relationships/${relationshipId}${query({ case_id: caseId })}`,
+      { caseId },
+    ),
+  reviewRelationship: (
+    caseId: string,
+    relationshipId: string,
+    payload: { decision: string; reviewer?: string; note?: string },
+  ) =>
+    request<RelationshipDetail>(
+      `/relationships/${relationshipId}/review${query({ case_id: caseId })}`,
+      { method: "POST", caseId, body: payload },
+    ),
+  spatial: (caseId: string) =>
+    request<SpatialResponse>(`/cases/${caseId}/spatial`, { caseId }),
+  reconstruction: (caseId: string) =>
+    request<ReconstructionResponse>(`/cases/${caseId}/reconstruction`, { caseId }),
 
   listFindings: (
     caseId: string,

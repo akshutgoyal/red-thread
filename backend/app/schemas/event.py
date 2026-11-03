@@ -69,6 +69,11 @@ class GraphEdgeRead(BaseModel):
     confidence: str
     supporting_event_ids: list[str] = []
     supporting_evidence_ids: list[str] = []
+    relationship_id: str | None = None
+    relationship_type: str | None = None
+    correlation_rule: str | None = None
+    classification: str | None = None
+    review_status: str | None = None
 
 
 class GraphResponse(BaseModel):

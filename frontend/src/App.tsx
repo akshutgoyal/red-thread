@@ -19,6 +19,9 @@ import { GraphPage } from "@/pages/GraphPage";
 import { FindingsPage } from "@/pages/FindingsPage";
 import { AiAssistantPage } from "@/pages/AiAssistantPage";
 import { ReportsPage } from "@/pages/ReportsPage";
+import { EntityExplorerPage } from "@/pages/EntityExplorerPage";
+import { SpatialPage } from "@/pages/SpatialPage";
+import { ReconstructionPage } from "@/pages/ReconstructionPage";
 
 function CaseRouteLayout() {
   const { caseId } = useParams<{ caseId: string }>();
@@ -43,10 +46,13 @@ export function App() {
               <Route index element={<CaseOverviewPage />} />
               <Route path="evidence" element={<EvidenceVaultPage />} />
               <Route path="evidence/intake" element={<EvidenceIntakePage />} />
+              <Route path="entities" element={<EntityExplorerPage />} />
               <Route path="auth" element={<AuthAnalysisPage />} />
               <Route path="timeline" element={<TimelinePage />} />
               <Route path="graph" element={<GraphPage />} />
+              <Route path="spatial" element={<SpatialPage />} />
               <Route path="findings" element={<FindingsPage />} />
+              <Route path="reconstruction" element={<ReconstructionPage />} />
               <Route path="ai" element={<AiAssistantPage />} />
               <Route path="reports" element={<ReportsPage />} />
             </Route>

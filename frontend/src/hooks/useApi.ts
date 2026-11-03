@@ -13,6 +13,13 @@ export const queryKeys = {
   graph: (caseId: string, includeTemporal: boolean) =>
     ["graph", caseId, includeTemporal] as const,
   entities: (caseId: string) => ["entities", caseId] as const,
+  entity: (caseId: string, entityId: string) => ["entity", caseId, entityId] as const,
+  relationships: (caseId: string, filters?: Record<string, unknown>) =>
+    ["relationships", caseId, filters ?? {}] as const,
+  relationship: (caseId: string, relationshipId: string) =>
+    ["relationship", caseId, relationshipId] as const,
+  spatial: (caseId: string) => ["spatial", caseId] as const,
+  reconstruction: (caseId: string) => ["reconstruction", caseId] as const,
   findings: (caseId: string, filters?: Record<string, unknown>) =>
     ["findings", caseId, filters ?? {}] as const,
   audit: (caseId: string) => ["audit", caseId] as const,
@@ -79,6 +86,49 @@ export function useEntities(caseId: string | undefined) {
   });
 }
 
+export function useEntityDetail(caseId: string | undefined, entityId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.entity(caseId ?? "", entityId ?? ""),
+    queryFn: () => api.getEntityDetail(caseId as string, entityId as string),
+    enabled: Boolean(caseId && entityId),
+  });
+}
+
+export function useRelationships(
+  caseId: string | undefined,
+  filters: Parameters<typeof api.listRelationships>[1] = {},
+) {
+  return useQuery({
+    queryKey: queryKeys.relationships(caseId ?? "", filters),
+    queryFn: () => api.listRelationships(caseId as string, filters),
+    enabled: Boolean(caseId),
+  });
+}
+
+export function useRelationship(caseId: string | undefined, relationshipId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.relationship(caseId ?? "", relationshipId ?? ""),
+    queryFn: () => api.getRelationship(caseId as string, relationshipId as string),
+    enabled: Boolean(caseId && relationshipId),
+  });
+}
+
+export function useSpatial(caseId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.spatial(caseId ?? ""),
+    queryFn: () => api.spatial(caseId as string),
+    enabled: Boolean(caseId),
+  });
+}
+
+export function useReconstruction(caseId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.reconstruction(caseId ?? ""),
+    queryFn: () => api.reconstruction(caseId as string),
+    enabled: Boolean(caseId),
+  });
+}
+
 export function useFindings(
   caseId: string | undefined,
   filters: Parameters<typeof api.listFindings>[1] = {},
@@ -122,6 +172,11 @@ function useCaseInvalidation(caseId: string) {
     client.invalidateQueries({ queryKey: ["graph", caseId] });
     client.invalidateQueries({ queryKey: ["findings", caseId] });
     client.invalidateQueries({ queryKey: queryKeys.audit(caseId) });
+    client.invalidateQueries({ queryKey: ["relationships", caseId] });
+    client.invalidateQueries({ queryKey: ["relationship", caseId] });
+    client.invalidateQueries({ queryKey: ["entity", caseId] });
+    client.invalidateQueries({ queryKey: queryKeys.spatial(caseId) });
+    client.invalidateQueries({ queryKey: queryKeys.reconstruction(caseId) });
   };
 }
 
@@ -192,6 +247,20 @@ export function useReviewFinding(caseId: string) {
       findingId: string;
       payload: { status: FindingStatus; reviewer_note?: string };
     }) => api.reviewFinding(caseId, findingId, payload),
+    onSuccess: invalidate,
+  });
+}
+
+export function useReviewRelationship(caseId: string) {
+  const invalidate = useCaseInvalidation(caseId);
+  return useMutation({
+    mutationFn: ({
+      relationshipId,
+      payload,
+    }: {
+      relationshipId: string;
+      payload: { decision: string; reviewer?: string; note?: string };
+    }) => api.reviewRelationship(caseId, relationshipId, payload),
     onSuccess: invalidate,
   });
 }

@@ -1,0 +1,4 @@
+timestamp,device_id,latitude,longitude,place,accuracy_m
+2026-10-14T19:04:00+05:30,DEV-DT-01,12.9716,77.5946,Central Junction,8
+2026-10-14T19:16:00+05:30,DEV-DT-01,12.9720,77.5950,Central Junction,7
+2026-10-14T19:26:00+05:30,DEV-DT-02,12.9352,77.6245,South Gate,12

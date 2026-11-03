@@ -117,6 +117,11 @@ export interface GraphEdge {
   confidence: string;
   supporting_event_ids: string[];
   supporting_evidence_ids: string[];
+  relationship_id?: string | null;
+  relationship_type?: string | null;
+  correlation_rule?: string | null;
+  classification?: string | null;
+  review_status?: string | null;
   data?: Record<string, unknown>;
 }
 
@@ -216,6 +221,101 @@ export interface ReportRecord {
   report_type: string;
   filename: string;
   status: string;
+  metadata?: Record<string, unknown>;
   generated_at: string;
+}
+
+export interface RelationshipSupport {
+  id: string;
+  relationship_id: string;
+  evidence_id: string | null;
+  event_id: string | null;
+  finding_id: string | null;
+  source_locator: string;
+  snippet: string;
+  support_kind: string;
+  created_at: string;
+}
+
+export interface ReviewDecision {
+  id: string;
+  case_id: string;
+  target_type: string;
+  target_id: string;
+  decision: string;
+  reviewer: string;
+  note: string;
+  created_at: string;
+}
+
+export interface Relationship {
+  id: string;
+  case_id: string;
+  source_type: string;
+  source_id: string;
+  target_type: string;
+  target_id: string;
+  relationship_type: string;
+  correlation_rule: string;
+  explanation: string;
+  confidence: string;
+  classification: string;
+  review_status: string;
+  review_note: string;
   metadata_json: Record<string, unknown>;
+  support_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RelationshipDetail extends Relationship {
+  supports: RelationshipSupport[];
+  reviews: ReviewDecision[];
+}
+
+export interface RelationshipListResponse {
+  items: Relationship[];
+  total: number;
+}
+
+export interface EntityDetail {
+  entity: EntityRecord;
+  events: EventRecord[];
+  relationships: Relationship[];
+  evidence_ids: string[];
+  mention_count: number;
+}
+
+export interface SpatialObservation {
+  event_id: string;
+  evidence_id: string;
+  event_type: string;
+  source_filename: string;
+  source_locator: string;
+  timestamp_normalized: string | null;
+  latitude: number;
+  longitude: number;
+  label: string;
+  entity_ids: string[];
+  entity_values: string[];
+}
+
+export interface SpatialResponse {
+  observations: SpatialObservation[];
+  relationships: Relationship[];
+  total: number;
+}
+
+export interface ReconstructionResponse {
+  case_id: string;
+  counts: Record<string, number>;
+  relationship_types: Record<string, number>;
+  review_statuses: Record<string, number>;
+  relationships: Relationship[];
+  recent_events: EventRecord[];
+  conflicts: Finding[];
+  unresolved: string[];
+  spatial_observations: SpatialObservation[];
+  generated_at: string;
+  limitations: string[];
 }

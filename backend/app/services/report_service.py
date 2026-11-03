@@ -24,8 +24,19 @@ from reportlab.platypus import (
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from ..models import AiQuery, AuditEvent, Case, Event, Evidence, Finding, GraphEdge, Report
+from ..models import (
+    AiQuery,
+    AuditEvent,
+    Case,
+    Event,
+    Evidence,
+    Finding,
+    GraphEdge,
+    Relationship,
+    Report,
+)
 from ..models.base import new_id
+from ..utils.geo import parse_coordinates
 from . import audit_service, storage_service
 
 DISCLAIMER = (
@@ -130,6 +141,46 @@ def _load_report_data(db: Session, case: Case) -> dict[str, Any]:
         )
     )
     graph_edges = list(db.scalars(select(GraphEdge).where(GraphEdge.case_id == case.id)))
+    relationships = list(
+        db.scalars(
+            select(Relationship)
+            .where(Relationship.case_id == case.id)
+            .options(selectinload(Relationship.supports))
+            .order_by(Relationship.created_at.asc())
+        )
+    )
+    spatial_observations: list[dict[str, Any]] = []
+    for event in events:
+        point = parse_coordinates(
+            (event.attributes_json or {}).get("latitude"),
+            (event.attributes_json or {}).get("longitude"),
+        )
+        if point is None:
+            continue
+        spatial_observations.append(
+            {
+                "event_id": event.id,
+                "event_type": event.event_type,
+                "timestamp_normalized": (
+                    event.timestamp_normalized.isoformat()
+                    if event.timestamp_normalized
+                    else None
+                ),
+                "source_filename": event.source_filename,
+                "source_locator": event.source_locator,
+                "evidence_id": event.evidence_id,
+                "latitude": point[0],
+                "longitude": point[1],
+                "label": str(
+                    (event.attributes_json or {}).get("place")
+                    or (event.attributes_json or {}).get("site_name")
+                    or (event.attributes_json or {}).get("location")
+                    or ""
+                ),
+            }
+        )
+    relationship_types = dict(Counter(item.relationship_type for item in relationships))
+    review_summary = dict(Counter(item.review_status for item in relationships))
 
     return {
         "case": {
@@ -223,6 +274,41 @@ def _load_report_data(db: Session, case: Case) -> dict[str, Any]:
                 for edge in graph_edges[:200]
             ],
         },
+        "relationship_summary": {
+            "count": len(relationships),
+            "by_type": relationship_types,
+            "review_status": review_summary,
+        },
+        "relationships": [
+            {
+                "id": relationship.id,
+                "source_type": relationship.source_type,
+                "source_id": relationship.source_id,
+                "target_type": relationship.target_type,
+                "target_id": relationship.target_id,
+                "relationship_type": relationship.relationship_type,
+                "correlation_rule": relationship.correlation_rule,
+                "explanation": relationship.explanation,
+                "confidence": relationship.confidence,
+                "classification": relationship.classification,
+                "review_status": relationship.review_status,
+                "review_note": relationship.review_note,
+                "metadata": relationship.metadata_json,
+                "supports": [
+                    {
+                        "evidence_id": support.evidence_id,
+                        "event_id": support.event_id,
+                        "finding_id": support.finding_id,
+                        "source_locator": support.source_locator,
+                        "snippet": support.snippet,
+                        "support_kind": support.support_kind,
+                    }
+                    for support in relationship.supports
+                ],
+            }
+            for relationship in relationships
+        ],
+        "spatial_observations": spatial_observations,
         "audit": [
             {
                 "id": item.id,
@@ -254,6 +340,8 @@ def _load_report_data(db: Session, case: Case) -> dict[str, Any]:
             "Threshold-based alerts are indicators, not proof of compromise.",
             "OCR, EXIF and compression analysis can produce false positives.",
             "Heuristic temporal proximity is a lead, not a relationship.",
+            "Deterministic relationships are correlation candidates, not proof of identity, causation or guilt.",
+            "Only documented coordinates are reported; routes are never inferred.",
             "AI-generated text is an interpretation and may be wrong.",
             DISCLAIMER,
         ],
@@ -506,6 +594,90 @@ def _build_pdf(path: Path, data: dict[str, Any]) -> None:
         )
     )
 
+    story.append(_paragraph("5.1 Provenance-backed relationships", section_style))
+    story.append(
+        _paragraph(
+            f"{data['relationship_summary']['count']} deterministic relationship record(s). "
+            f"By type: {json.dumps(data['relationship_summary']['by_type'], default=str)}. "
+            f"Review status: {json.dumps(data['relationship_summary']['review_status'], default=str)}.",
+            body_style,
+        )
+    )
+    if data["relationships"]:
+        relationship_rows: list[list[Any]] = [
+            ["Type", "Rule", "Class", "Confidence", "Review", "Explanation / support"]
+        ]
+        for relationship in data["relationships"][:80]:
+            support_text = "; ".join(
+                f"{support['evidence_id'] or '-'} / "
+                f"{support['event_id'] or '-'} / "
+                f"{support['source_locator'] or '-'}"
+                for support in relationship["supports"][:4]
+            )
+            relationship_rows.append(
+                [
+                    _paragraph(relationship["relationship_type"], small_style),
+                    _paragraph(relationship["correlation_rule"], small_style),
+                    _paragraph(relationship["classification"], small_style),
+                    _paragraph(relationship["confidence"], small_style),
+                    _paragraph(relationship["review_status"], small_style),
+                    _paragraph(
+                        (relationship["explanation"] or "")
+                        + (" | Support: " + support_text if support_text else ""),
+                        small_style,
+                    ),
+                ]
+            )
+        story.append(
+            _table(
+                relationship_rows,
+                [23 * mm, 27 * mm, 18 * mm, 16 * mm, 20 * mm, 74 * mm],
+                font_size=6.2,
+            )
+        )
+        if len(data["relationships"]) > 80:
+            story.append(
+                _paragraph(
+                    f"Showing 80 of {len(data['relationships'])} relationships; the complete "
+                    "set is available in the JSON report.",
+                    small_style,
+                )
+            )
+    else:
+        story.append(_paragraph("No deterministic relationships were generated.", body_style))
+
+    story.append(_paragraph("5.2 Documented spatial observations", section_style))
+    if data["spatial_observations"]:
+        spatial_rows: list[list[Any]] = [
+            ["Time (UTC)", "Event", "Coordinates", "Label", "Source"]
+        ]
+        for observation in data["spatial_observations"][:80]:
+            spatial_rows.append(
+                [
+                    _paragraph(observation["timestamp_normalized"] or "unknown", small_style),
+                    _paragraph(observation["event_type"], small_style),
+                    _paragraph(
+                        f"{observation['latitude']:.6f}, {observation['longitude']:.6f}",
+                        mono_style,
+                    ),
+                    _paragraph(observation["label"] or "-", small_style),
+                    _paragraph(
+                        f"{observation['evidence_id']} / {observation['source_locator']}",
+                        small_style,
+                    ),
+                ]
+            )
+        story.append(
+            _table(spatial_rows, [25 * mm, 28 * mm, 38 * mm, 35 * mm, 52 * mm], font_size=6.2)
+        )
+    else:
+        story.append(
+            _paragraph(
+                "No documented coordinates were found. No locations or routes are inferred.",
+                body_style,
+            )
+        )
+
     story.append(_paragraph("6. AI-generated interpretations", section_style))
     story.append(
         _paragraph(
@@ -638,6 +810,8 @@ def generate_report(
         "finding_count": len(data["findings"]),
         "ai_query_count": len(data["ai_queries"]),
         "graph_edge_count": data["graph"]["edge_count"],
+        "relationship_count": data["relationship_summary"]["count"],
+        "spatial_observation_count": len(data["spatial_observations"]),
         "disclaimer": DISCLAIMER,
     }
     report = Report(
