@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --bg: 245 247 251;
+  --surface: 255 255 255;
+  --surface-2: 241 245 249;
+  --surface-3: 226 232 240;
+  --border: 226 232 240;
+  --border-strong: 203 213 225;
+  --text: 15 23 42;
+  --text-2: 51 65 85;
+  --text-3: 100 116 139;
+  --accent: 8 145 178;
+  --accent-strong: 14 116 144;
+  --accent-soft: 236 254 255;
+  --focus-ring: 8 145 178;
+  --shadow-card:
+    0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 30px rgba(15, 23, 42, 0.05);
+  --shadow-card-hover:
+    0 1px 2px rgba(15, 23, 42, 0.06), 0 16px 40px rgba(15, 23, 42, 0.09);
+  --chart-grid: #e2e8f0;
+  --chart-axis: #64748b;
+  --chart-tooltip-bg: #ffffff;
+  --chart-tooltip-border: #e2e8f0;
+  --chart-cyan: #0891b2;
+  --chart-violet: #7c3aed;
+  --chart-amber: #d97706;
+  --chart-rose: #e11d48;
+  --chart-emerald: #059669;
+  --chart-sky: #0284c7;
+  --chart-orange: #ea580c;
+  --chart-slate: #64748b;
+  --graph-bg: #f8fafc;
+  --graph-grid: #e2e8f0;
+  --graph-edge: #94a3b8;
+}
+
+.dark {
+  color-scheme: dark;
+  --bg: 7 11 18;
+  --surface: 15 23 42;
+  --surface-2: 17 28 46;
+  --surface-3: 30 41 59;
+  --border: 30 41 59;
+  --border-strong: 51 65 85;
+  --text: 248 250 252;
+  --text-2: 203 213 225;
+  --text-3: 148 163 184;
+  --accent: 34 211 238;
+  --accent-strong: 103 232 249;
+  --accent-soft: 8 47 65;
+  --focus-ring: 34 211 238;
+  --shadow-card:
+    0 1px 0 rgba(255, 255, 255, 0.03) inset,
+    0 12px 40px rgba(0, 0, 0, 0.25);
+  --shadow-card-hover:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 18px 50px rgba(0, 0, 0, 0.38);
+  --chart-grid: #1e293b;
+  --chart-axis: #94a3b8;
+  --chart-tooltip-bg: #0f172a;
+  --chart-tooltip-border: #1e293b;
+  --chart-cyan: #22d3ee;
+  --chart-violet: #a78bfa;
+  --chart-amber: #fbbf24;
+  --chart-rose: #fb7185;
+  --chart-emerald: #34d399;
+  --chart-sky: #38bdf8;
+  --chart-orange: #fb923c;
+  --chart-slate: #94a3b8;
+  --graph-bg: #070b12;
+  --graph-grid: #1e293b;
+  --graph-edge: #475569;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: rgb(var(--bg));
+  background-image: radial-gradient(
+    circle at top right,
+    rgb(var(--accent) / 0.07),
+    transparent 34%
+  );
+  color: rgb(var(--text));
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+::selection {
+  background-color: rgb(var(--accent) / 0.25);
+  color: rgb(var(--text));
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--border-strong)) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--border-strong));
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@layer components {
+  .app-aurora {
+    background-image:
+      radial-gradient(
+        circle at 15% -10%,
+        rgb(var(--accent) / 0.12),
+        transparent 32%
+      ),
+      radial-gradient(
+        circle at 100% 0%,
+        rgba(139, 92, 246, 0.07),
+        transparent 30%
+      );
+  }
+
+  .graph-canvas {
+    background-color: var(--graph-bg);
+    background-image: radial-gradient(
+      rgb(var(--graph-grid)) 1px,
+      transparent 1px
+    );
+    background-size: 22px 22px;
+  }
+
+  .hud-grid {
+    background-image:
+      linear-gradient(rgb(var(--text-3) / 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--text-3) / 0.05) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  .kbd {
+    @apply inline-flex items-center rounded border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-muted;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

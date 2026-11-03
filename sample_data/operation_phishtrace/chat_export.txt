@@ -1,0 +1,20 @@
+[2026-10-15, 09:00:00 IST] +91-91234-56789: Good morning. Did you receive the vendor list?
+[2026-10-15, 09:02:10 IST] +91-99887-76655: Yes, reviewing it now.
+[2026-10-15, 09:05:00 IST] +91-91234-56789: Please keep the invoice copy ready.
+[2026-10-15, 09:10:00 IST] +91-99887-76655: Sure.
+[2026-10-15, 09:20:00 IST] +91-91234-56789: The audit team may call today.
+[2026-10-15, 09:30:00 IST] +91-99887-76655: I will keep my phone nearby.
+[2026-10-15, 09:45:00 IST] +91-91234-56789: Thanks.
+[2026-10-15, 10:00:00 IST] +91-91234-56789: Any update?
+[2026-10-15, 10:05:00 IST] +91-99887-76655: Still waiting.
+[2026-10-15, 10:10:00 IST] +91-91234-56789: Please stay available.
+[2026-10-15, 10:16:00 IST] +91-98765-43210: Hello, this is the cyber compliance desk.
+[2026-10-15, 10:18:30 IST] +91-98765-43210: Turant INR 45,000 bhejo warna account block ho jayega. Government security verification ke liye.
+[2026-10-15, 10:20:00 IST] +91-91234-56789: Is this official? Please share a reference.
+[2026-10-15, 10:24:15 IST] +91-98765-43210: <attached: invoice_45000.pdf> Invoice bhej diya. Jaldi pay karo. gov-security@upi par transfer karo.
+[2026-10-15, 10:26:00 IST] +91-98765-43210: Reference UTR 312456789012 use karna.
+[2026-10-15, 10:30:00 IST] +91-91234-56789: I am checking with my bank.
+[2026-10-15, 10:45:00 IST] +91-98765-43210: Delay mat karo. Case file open ho jayegi.
+[2026-10-15, 11:05:00 IST] +91-91234-56789: Payment done. Please confirm.
+[2026-10-15, 11:20:00 IST] +91-98765-43210: Received. Thank you.
+[2026-10-15, 14:00:00 IST] +91-91234-56789: I will report this to the bank.

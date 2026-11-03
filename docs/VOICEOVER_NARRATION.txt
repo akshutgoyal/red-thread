@@ -1,0 +1,49 @@
+VIDEO 1 — workspace and case overview
+
+Meet Red Thread, a digital forensics prototype that brings fragmented evidence into one investigation workspace.
+
+The dashboard summarizes case activity, evidence files, event types, and findings that need an investigator's attention.
+
+Opening Operation PhishTrace brings the synthetic case's evidence, events, and findings into one overview.
+
+Investigators can update case status and notes while keeping the investigation's context together.
+
+The audit trail records uploads, verification checks, and case updates for later review.
+
+The evidence vault lists each file, its recorded hash, processing status, and integrity result.
+
+
+
+VIDEO 2 — investigation and reporting
+
+From the evidence vault, we can inspect original files and prepare new evidence for processing.
+
+Authentication analysis highlights login activity and suspicious patterns, with parsed events available for closer review.
+
+Behind these views, Red Thread extracts structured events and identifiers from logs, chats, invoices, payment records, and images.
+
+It compares shared identifiers across sources, keeping exact matches separate from conflicts and tentative leads. The core checks work independently of AI.
+
+The relationship graph brings evidence, events, and entities together. Selecting a node reveals its details and connections.
+
+Findings can be filtered by severity, helping investigators focus on amount discrepancies, payee mismatches, and other issues.
+
+Opening a finding reveals its explanation, supporting records, limitations, and alternative explanations. Investigators can record a review decision after checking the evidence.
+
+Back in the vault, we inspect the invoice and payment screenshot directly. SHA-256 verification checks whether stored bytes match their intake hash; it does not establish whether a file was authentic before upload.
+
+The unified timeline places extracted events in sequence, while flagging inferred dates and uncertain timestamps. This helps investigators distinguish recorded facts from assumptions.
+
+The optional AI assistant answers questions using selected case records. Here, we ask it to explain the payment discrepancy.
+
+In this synthetic case, the screenshot shows four thousand five hundred rupees, while the ledger records forty-five thousand under the same transaction reference.
+
+The response includes source citations, uncertainties, and suggested next steps, giving investigators references to verify.
+
+The reporting workspace provides PDF and JSON exports that capture evidence hashes, findings, timeline events, and review information.
+
+The report keeps these details together for review. Findings remain investigative indicators, and the export is a draft requiring human assessment.
+
+Red Thread: connecting evidence, with investigators in control.
+
+

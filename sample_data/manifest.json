@@ -1,0 +1,13 @@
+{
+  "warning": "SYNTHETIC DEMO DATA. Not real evidence.",
+  "files": {
+    "benign_control/invoice_legit.pdf": "a78a39db95cbe9e30c76fce8f960bfdc352a95764a4bf58039d6dd56a7cd3105",
+    "benign_control/upi_statement.csv": "86098436213eaef75d7d6721d2daa2c8e720292b290acc8cf92bc4978652c3d8",
+    "operation_phishtrace/auth.log": "92770dd32d928e51b2e5da50c9eca6c6cc0e6a7cffcbb4b7bc322bcadf55cec4",
+    "operation_phishtrace/call_log.csv": "0b13874f715d4aa336c34ce81b480da970d5ad481d1b4038c91e8746d3ba4813",
+    "operation_phishtrace/chat_export.txt": "0483770b63969ac133f515bfeb3f36163436b956a01c5c4b89b958ffedd357ef",
+    "operation_phishtrace/invoice_45000.pdf": "efd9030a734971c1c3ab8b4e0d2c99c3bce93664249d3762d9985bc9acf653cb",
+    "operation_phishtrace/payment_screenshot.png": "8648252cd2f941513d77adac2609b9d2cc1473e955c88c0fc05d4624634722ee",
+    "operation_phishtrace/upi_transaction_log.csv": "495d908beae06766e02ec9ed7c6c7b48561398f064960a526dba56f7fb0e1775"
+  }
+}
