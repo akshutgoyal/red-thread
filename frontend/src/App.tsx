@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { Fragment, useEffect } from "react";
 import {
   BrowserRouter,
   Outlet,
@@ -31,7 +31,11 @@ function CaseRouteLayout() {
     if (caseId) setSelectedCaseId(caseId);
   }, [caseId, setSelectedCaseId]);
 
-  return <Outlet />;
+  return (
+    <Fragment key={caseId}>
+      <Outlet />
+    </Fragment>
+  );
 }
 
 export function App() {

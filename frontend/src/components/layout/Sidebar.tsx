@@ -13,7 +13,7 @@ import {
   Sparkles,
   UploadCloud,
 } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useCaseContext } from "@/context/CaseContext";
 import { useAiStatus, useHealth } from "@/hooks/useApi";
 import { cn } from "@/lib/cn";
@@ -43,10 +43,23 @@ const caseItems = [
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { cases, selectedCaseId, selectedCase, setSelectedCaseId } =
     useCaseContext();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { data: health } = useHealth();
   const { data: aiStatus } = useAiStatus();
 
   const caseBase = selectedCaseId ? `/cases/${selectedCaseId}` : null;
+
+  function handleCaseChange(caseId: string) {
+    const nextCaseId = caseId || null;
+    setSelectedCaseId(nextCaseId);
+    if (!nextCaseId) return;
+
+    const casePath = location.pathname.match(/^\/cases\/[^/]+(\/.*)?$/);
+    if (casePath) {
+      navigate(`/cases/${nextCaseId}${casePath[1] ?? ""}`);
+    }
+  }
 
   return (
     <aside className="flex h-full w-72 flex-col border-r border-line bg-surface/95 backdrop-blur-xl">
@@ -76,7 +89,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         </label>
         <select
           value={selectedCaseId ?? ""}
-          onChange={(event) => setSelectedCaseId(event.target.value || null)}
+          onChange={(event) => handleCaseChange(event.target.value)}
           className="w-full cursor-pointer rounded-lg border border-line-strong bg-surface-2 px-3 py-2 text-xs text-primary transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
         >
           {cases.length === 0 ? <option value="">No cases yet</option> : null}
