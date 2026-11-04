@@ -184,6 +184,7 @@ red-thread/
 ├── scripts/
 │   └── seed_demo.py                 uploads and processes the demo via the API
 ├── docs/
+│   ├── ACCEPTANCE.md
 │   ├── ARCHITECTURE.md
 │   ├── AI_INTEGRATION.md
 │   ├── AUTH_PARSER.md
