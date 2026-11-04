@@ -3,11 +3,28 @@
 Red Thread uses AI only as an **optional reasoning assistant**. Parsing, hashing, integrity checks,
 transaction calculations, correlation and rule-based findings do not depend on AI.
 
-The assistant model is **DeepSeek V4.1 Flash**. CommandCode and TokenHarbor are API transports,
-not different models. The UI labels the assistant by model name and exposes the route/provider
+The assistant model is **DeepSeek V4.1 Flash**. Isoquant, CommandCode and TokenHarbor are API
+transports, not different models. The UI labels the assistant by model name and exposes the route/provider
 only as transport metadata for privacy disclosure and troubleshooting.
 
 ## Providers
+
+### Isoquant
+
+- Base URL: `https://api.isoquant.ai/v1`
+- Endpoint: `POST /v1/chat/completions` (OpenAI-compatible)
+- Authentication: `Authorization: Bearer <ISOQUANT_API_KEY>` (also accepts `x-api-key`)
+- Model: `deepseek-v4.1-flash-1017-fast`
+- ZDR: `Isoquant-ZDR: required`
+- Reasoning: `reasoning_effort` = `none`, `low`, or `high`; default `high`
+- Output: `max_tokens` is shared by reasoning and the answer. The model context is
+  1,048,576 tokens; default output is 16,384 and the maximum is 943,718.
+- `ISOQUANT_JSON_MODE=true` sends `response_format: {"type":"json_object"}`.
+- Isoquant does **not** list `temperature` as a supported parameter for this model; the
+  provider deliberately omits it.
+- `402` is an insufficient-credit error and is surfaced without retrying.
+- The public model catalog reports $0.035/M input, $0.005/M cached input and $0.45/M output
+  for this fast model. Check Console billing before switching production traffic.
 
 ### CommandCode Provider API
 
@@ -36,11 +53,12 @@ clients; the API model ID is `deepseek-v4.1-flash:free`.
 RED_THREAD_AI_PROVIDER=auto
 ```
 
-1. If `COMMANDCODE_API_KEY` is set, use CommandCode.
-2. Else if `TOKENHARBOR_API_KEY` is set, use TokenHarbor.
-3. Else disable AI and return a configuration status.
+1. If `ISOQUANT_API_KEY` is set, use Isoquant.
+2. Else if `COMMANDCODE_API_KEY` is set, use CommandCode.
+3. Else if `TOKENHARBOR_API_KEY` is set, use TokenHarbor.
+4. Else disable AI and return a configuration status.
 
-Set `RED_THREAD_AI_PROVIDER=commandcode` or `tokenharbor` to force a provider. There is no silent
+Set `RED_THREAD_AI_PROVIDER=isoquant`, `commandcode` or `tokenharbor` to force a provider. There is no silent
 fallback to another provider or to a local model after a configured provider fails.
 
 ## Configuration check
@@ -148,6 +166,20 @@ The context closing tag is escaped so evidence text cannot terminate the context
 - Do not send confidential evidence to an external provider unless authorized and consistent
   with the provider's data-handling terms. Red Thread does not claim that external API processing is
   private or compliant for every dataset.
+
+## Local Isoquant verification
+
+On 2026-11-04, with `ISOQUANT_API_KEY` configured locally and
+`RED_THREAD_AI_PROVIDER=isoquant`:
+
+- `GET /api/ai/status?check=true` returned `ok: true` for
+  `deepseek-v4.1-flash-1017-fast` at `api.isoquant.ai` in 1.6 s.
+- The focused Digital Trail question used the provider, returned HTTP 200 in 31.6 s, and
+  produced 20 citations; all 20 passed locator validation.
+- The response correctly separated exact structured device/place matches from call-tower
+  inference, textual co-mentions and temporal/spatial leads.
+- The provider sent `Isoquant-ZDR: required`, omitted `temperature`, used
+  `reasoning_effort=high`, and requested JSON output.
 
 ## Live verification
 

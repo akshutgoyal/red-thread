@@ -5,7 +5,7 @@ def test_health(client):
     assert payload["status"] == "ok"
     assert payload["database"] == "ok"
     assert payload["app"] == "Red Thread"
-    assert payload["ai_provider"] in {"commandcode", "tokenharbor", "none"}
+    assert payload["ai_provider"] in {"isoquant", "commandcode", "tokenharbor", "none"}
 
 
 def test_root(client):

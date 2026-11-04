@@ -107,6 +107,78 @@ def test_resolve_provider_auto_prefers_commandcode():
     assert status.api_key == "cc-key"
 
 
+def test_resolve_provider_auto_prefers_isoquant():
+    settings = settings_for(
+        ai_provider="auto",
+        ISOQUANT_API_KEY="iq-key",
+        COMMANDCODE_API_KEY="cc-key",
+        TOKENHARBOR_API_KEY="th-key",
+    )
+    status = ai_service.resolve_provider(settings)
+    assert status.configured is True
+    assert status.provider == "isoquant"
+    assert status.model == "deepseek-v4.1-flash-1017-fast"
+    assert status.base_url == "https://api.isoquant.ai/v1"
+    assert status.api_key == "iq-key"
+    assert status.zdr is True
+
+
+def test_isoquant_provider_headers_payload_and_json_mode():
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["authorization"] = request.headers.get("authorization", "")
+        captured["zdr"] = request.headers.get("Isoquant-ZDR", "")
+        captured["body"] = json.loads(request.content)
+        return chat_response('{"answer":"ok"}')
+
+    settings = settings_for(
+        ai_provider="isoquant",
+        ISOQUANT_API_KEY="test-key",
+        ai_max_retries=0,
+        ISOQUANT_REASONING_EFFORT="high",
+    )
+    status = ai_service.resolve_provider(settings)
+    provider = ai_service.build_provider(
+        status, settings, transport=transport_for(handler)
+    )
+    result = __import__("asyncio").run(provider.complete("system", "user"))
+
+    assert result.provider == "isoquant"
+    assert result.model == "deepseek-v4.1-flash-1017-fast"
+    assert captured["authorization"] == "Bearer test-key"
+    assert captured["zdr"] == "required"
+    body = captured["body"]
+    assert body["model"] == "deepseek-v4.1-flash-1017-fast"
+    assert body["reasoning_effort"] == "high"
+    assert body["response_format"] == {"type": "json_object"}
+    assert "temperature" not in body
+    assert body["max_tokens"] == settings.ai_max_tokens
+
+
+def test_isoquant_insufficient_credit_is_402():
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            402,
+            json={"error": {"message": "Insufficient credit", "code": "insufficient_credit"}},
+        )
+
+    settings = settings_for(
+        ai_provider="isoquant",
+        ISOQUANT_API_KEY="test-key",
+        ai_max_retries=0,
+    )
+    provider = ai_service.build_provider(
+        ai_service.resolve_provider(settings),
+        settings,
+        transport=transport_for(handler),
+    )
+    with pytest.raises(ai_service.AIError) as error:
+        __import__("asyncio").run(provider.complete("system", "user"))
+    assert error.value.code == "insufficient_credit"
+    assert error.value.status_code == 402
+
+
 def test_resolve_provider_falls_back_to_tokenharbor():
     settings = settings_for(
         ai_provider="auto",
@@ -566,4 +638,6 @@ def test_model_label_maps_deepseek_flash():
 
     assert model_label("deepseek-v4.1-flash:free") == "DeepSeek V4.1 Flash"
     assert model_label("deepseek/deepseek-v4.1-flash") == "DeepSeek V4.1 Flash"
+    assert model_label("deepseek-v4.1-flash-1017-fast") == "DeepSeek V4.1 Flash 1017 Fast"
+    assert model_label("deepseek-v4.1-flash-1017") == "DeepSeek V4.1 Flash 1017"
     assert model_label("another-model") == "another-model"

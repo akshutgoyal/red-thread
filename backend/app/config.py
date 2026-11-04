@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -79,6 +80,22 @@ class Settings(BaseSettings):
         default="deepseek-v4.1-flash:free",
         validation_alias="TOKENHARBOR_MODEL",
     )
+
+    isoquant_api_key: str | None = Field(default=None, validation_alias="ISOQUANT_API_KEY")
+    isoquant_base_url: str = Field(
+        default="https://api.isoquant.ai/v1",
+        validation_alias="ISOQUANT_BASE_URL",
+    )
+    isoquant_model: str = Field(
+        default="deepseek-v4.1-flash-1017-fast",
+        validation_alias="ISOQUANT_MODEL",
+    )
+    isoquant_zdr: bool = Field(default=True, validation_alias="ISOQUANT_ZDR")
+    isoquant_reasoning_effort: Literal["none", "low", "high"] = Field(
+        default="high",
+        validation_alias="ISOQUANT_REASONING_EFFORT",
+    )
+    isoquant_json_mode: bool = Field(default=True, validation_alias="ISOQUANT_JSON_MODE")
 
     tesseract_cmd: str | None = Field(default=None, validation_alias="TESSERACT_CMD")
 

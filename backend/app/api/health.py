@@ -17,6 +17,8 @@ router = APIRouter(tags=["health"])
 def selected_provider(settings: Settings) -> str:
     provider = (settings.ai_provider or "auto").strip().lower()
     if provider == "auto":
+        if settings.isoquant_api_key:
+            return "isoquant"
         if settings.commandcode_api_key:
             return "commandcode"
         if settings.tokenharbor_api_key:
@@ -30,6 +32,8 @@ def provider_configured(settings: Settings, provider: str) -> bool:
         return bool(settings.commandcode_api_key)
     if provider == "tokenharbor":
         return bool(settings.tokenharbor_api_key)
+    if provider == "isoquant":
+        return bool(settings.isoquant_api_key)
     return False
 
 

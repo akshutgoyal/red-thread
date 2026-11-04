@@ -136,6 +136,11 @@ class OpenAICompatibleProvider:
         max_retries: int,
         max_tokens: int = 8192,
         zdr: bool = False,
+        zdr_header: str = "x-cmd-zdr",
+        zdr_value: str = "1",
+        send_temperature: bool = True,
+        reasoning_effort: str | None = None,
+        response_format: dict[str, str] | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
     ):
         self.name = name
@@ -146,6 +151,11 @@ class OpenAICompatibleProvider:
         self.max_retries = max(0, max_retries)
         self.max_tokens = max(256, max_tokens)
         self.zdr = zdr
+        self.zdr_header = zdr_header
+        self.zdr_value = zdr_value
+        self.send_temperature = send_temperature
+        self.reasoning_effort = reasoning_effort
+        self.response_format = response_format
         self.transport = transport
 
     async def complete(self, system_prompt: str, user_prompt: str) -> AIResponse:
@@ -155,17 +165,22 @@ class OpenAICompatibleProvider:
             "Content-Type": "application/json",
         }
         if self.zdr:
-            headers["x-cmd-zdr"] = "1"
+            headers[self.zdr_header] = self.zdr_value
         payload = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            "temperature": 0.1,
             "max_tokens": self.max_tokens,
             "stream": False,
         }
+        if self.send_temperature:
+            payload["temperature"] = 0.1
+        if self.reasoning_effort:
+            payload["reasoning_effort"] = self.reasoning_effort
+        if self.response_format:
+            payload["response_format"] = self.response_format
 
         started = time.perf_counter()
         last_error: AIError | None = None
@@ -199,6 +214,12 @@ class OpenAICompatibleProvider:
                         await asyncio.sleep(min(max(delay, 0.25), 6.0))
                         continue
 
+                if response.status_code == 402:
+                    raise AIError(
+                        "insufficient_credit",
+                        "The AI provider account has insufficient credit. Add credit in the provider console.",
+                        402,
+                    )
                 if response.status_code in {401, 403}:
                     raise AIError(
                         "invalid_credentials",
@@ -281,7 +302,7 @@ class OpenAICompatibleProvider:
 
 def resolve_provider(settings: Settings) -> ProviderStatus:
     configured_provider = (settings.ai_provider or "auto").strip().lower()
-    if configured_provider not in {"auto", "commandcode", "tokenharbor", "none"}:
+    if configured_provider not in {"auto", "isoquant", "commandcode", "tokenharbor", "none"}:
         return ProviderStatus(
             configured=False,
             provider="none",
@@ -300,7 +321,9 @@ def resolve_provider(settings: Settings) -> ProviderStatus:
         )
 
     if configured_provider == "auto":
-        if settings.commandcode_api_key:
+        if settings.isoquant_api_key:
+            configured_provider = "isoquant"
+        elif settings.commandcode_api_key:
             configured_provider = "commandcode"
         elif settings.tokenharbor_api_key:
             configured_provider = "tokenharbor"
@@ -311,10 +334,29 @@ def resolve_provider(settings: Settings) -> ProviderStatus:
                 model="",
                 base_url="",
                 reason=(
-                    "No AI API key is configured. Set COMMANDCODE_API_KEY or "
-                    "TOKENHARBOR_API_KEY to enable the optional assistant."
+                    "No AI API key is configured. Set ISOQUANT_API_KEY, "
+                    "COMMANDCODE_API_KEY or TOKENHARBOR_API_KEY to enable the optional assistant."
                 ),
             )
+
+    if configured_provider == "isoquant":
+        if not settings.isoquant_api_key:
+            return ProviderStatus(
+                configured=False,
+                provider="isoquant",
+                model=settings.isoquant_model,
+                base_url=settings.isoquant_base_url,
+                reason="ISOQUANT_API_KEY is not set.",
+            )
+        return ProviderStatus(
+            configured=True,
+            provider="isoquant",
+            model=settings.isoquant_model,
+            base_url=settings.isoquant_base_url,
+            reason="Configured through ISOQUANT_API_KEY.",
+            api_key=settings.isoquant_api_key,
+            zdr=settings.isoquant_zdr,
+        )
 
     if configured_provider == "commandcode":
         if not settings.commandcode_api_key:
@@ -360,6 +402,7 @@ def build_provider(
 ) -> OpenAICompatibleProvider:
     if not status.configured or not status.api_key:
         raise AIError("not_configured", "The AI provider is not configured.", 503)
+    is_isoquant = status.provider == "isoquant"
     return OpenAICompatibleProvider(
         name=status.provider,
         base_url=status.base_url,
@@ -369,6 +412,17 @@ def build_provider(
         max_retries=settings.ai_max_retries,
         max_tokens=settings.ai_max_tokens,
         zdr=status.zdr,
+        zdr_header="Isoquant-ZDR" if is_isoquant else "x-cmd-zdr",
+        zdr_value="required" if is_isoquant else "1",
+        send_temperature=not is_isoquant,
+        reasoning_effort=(
+            settings.isoquant_reasoning_effort if is_isoquant else None
+        ),
+        response_format=(
+            {"type": "json_object"}
+            if is_isoquant and settings.isoquant_json_mode
+            else None
+        ),
         transport=transport,
     )
 
@@ -867,6 +921,8 @@ async def get_status(
 
 def model_label(model: str) -> str:
     normalized = (model or "").lower()
+    if "deepseek-v4.1-flash-1017" in normalized:
+        return "DeepSeek V4.1 Flash 1017 Fast" if "fast" in normalized else "DeepSeek V4.1 Flash 1017"
     if "deepseek-v4.1-flash" in normalized:
         return "DeepSeek V4.1 Flash"
     return model
