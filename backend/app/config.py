@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     r2_region: str = Field(default="auto", validation_alias="R2_REGION")
 
     auth_required: bool = True
+    rate_limit_enabled: bool = True
+    rate_limit_api_per_minute: int = 120
+    rate_limit_auth_per_minute: int = 10
+    rate_limit_demo_per_10_minutes: int = 3
+    rate_limit_ai_per_minute: int = 8
+    rate_limit_uploads_per_minute: int = 30
     session_secret: str = "red-thread-dev-session-secret-change-me"
     session_ttl_hours: int = 168
     google_client_id: str | None = Field(default=None, validation_alias="GOOGLE_CLIENT_ID")
@@ -63,6 +69,10 @@ class Settings(BaseSettings):
     ai_max_retries: int = 2
     ai_max_context_chars: int = 60000
     ai_max_tokens: int = 8192
+    ai_budget_usd: float = 0.5
+    isoquant_input_cost_per_million: float = 0.035
+    isoquant_cached_input_cost_per_million: float = 0.005
+    isoquant_output_cost_per_million: float = 0.45
     ai_redact_pii: bool = True
 
     commandcode_api_key: str | None = Field(default=None, validation_alias="COMMANDCODE_API_KEY")

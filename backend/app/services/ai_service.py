@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 
 import httpx
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..config import Settings
@@ -957,6 +957,23 @@ async def check_provider(
         return {"ok": False, "code": "check_failed", "error": str(error)}
 
 
+def _estimate_ai_cost(
+    provider: str,
+    prompt_tokens: int,
+    cached_tokens: int,
+    completion_tokens: int,
+    settings: Settings,
+) -> float:
+    if provider != "isoquant":
+        return 0.0
+    billed_input = max(0, prompt_tokens - cached_tokens)
+    return (
+        billed_input / 1_000_000 * settings.isoquant_input_cost_per_million
+        + cached_tokens / 1_000_000 * settings.isoquant_cached_input_cost_per_million
+        + completion_tokens / 1_000_000 * settings.isoquant_output_cost_per_million
+    )
+
+
 async def ask_ai(
     db: Session,
     case_id: str,
@@ -980,6 +997,19 @@ async def ask_ai(
                 "in the backend environment and restart the service. The deterministic "
                 "investigation pipeline remains available without AI."
             ),
+        )
+
+    spent = (
+        db.scalar(select(func.coalesce(func.sum(AiQuery.cost_usd), 0.0))) or 0.0
+    )
+    if spent >= settings.ai_budget_usd:
+        raise AIError(
+            "budget_exhausted",
+            (
+                "The configured AI budget has been exhausted. "
+                "Increase RED_THREAD_AI_BUDGET_USD to continue."
+            ),
+            402,
         )
 
     context_json, context_ids, context_maps = _build_context(
@@ -1032,6 +1062,17 @@ async def ask_ai(
             insufficient = True
 
     usage = response.usage or {}
+    prompt_tokens = usage.get("prompt_tokens") or usage.get("input_tokens") or 0
+    completion_tokens = usage.get("completion_tokens") or usage.get("output_tokens") or 0
+    cached_tokens = (
+        usage.get("cached_tokens")
+        or usage.get("cache_read_input_tokens")
+        or (usage.get("prompt_tokens_details") or {}).get("cached_tokens")
+        or 0
+    )
+    cost_usd = _estimate_ai_cost(
+        response.provider, prompt_tokens, cached_tokens, completion_tokens, settings
+    )
     record = AiQuery(
         case_id=case_id,
         question=question.strip()[:4000],
@@ -1040,8 +1081,10 @@ async def ask_ai(
         answer=answer[:20000],
         citations_json=citations,
         validation_status=validation_status,
-        prompt_tokens=usage.get("prompt_tokens") or usage.get("input_tokens"),
-        completion_tokens=usage.get("completion_tokens") or usage.get("output_tokens"),
+        prompt_tokens=prompt_tokens or None,
+        completion_tokens=completion_tokens or None,
+        cached_tokens=cached_tokens or None,
+        cost_usd=cost_usd,
         latency_ms=response.latency_ms,
     )
     db.add(record)

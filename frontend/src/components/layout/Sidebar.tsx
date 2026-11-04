@@ -160,8 +160,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <button
               type="button"
               className="flex-1 rounded-lg border border-line px-2 py-1.5 text-[10px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent"
-              onClick={() => {
-                logout();
+              onClick={async () => {
+                await logout();
                 navigate("/login");
               }}
             >
@@ -183,8 +183,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <button
               type="button"
               className="rounded-lg border border-line px-2 py-1.5 text-[10px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent"
-              onClick={() => {
-                logout();
+              onClick={async () => {
+                await logout();
                 navigate("/login");
               }}
             >

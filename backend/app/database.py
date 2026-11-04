@@ -75,3 +75,17 @@ def _apply_lightweight_migrations() -> None:
         connection.execute(
             text("UPDATE cases SET is_demo = TRUE WHERE owner_id IS NULL")
         )
+        if "ai_queries" in inspector.get_table_names():
+            ai_columns = {
+                column["name"] for column in inspector.get_columns("ai_queries")
+            }
+            if "cached_tokens" not in ai_columns:
+                connection.execute(
+                    text("ALTER TABLE ai_queries ADD COLUMN cached_tokens INTEGER")
+                )
+            if "cost_usd" not in ai_columns:
+                connection.execute(
+                    text(
+                        "ALTER TABLE ai_queries ADD COLUMN cost_usd DOUBLE PRECISION NOT NULL DEFAULT 0"
+                    )
+                )

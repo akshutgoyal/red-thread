@@ -94,3 +94,53 @@ def test_google_login_creates_a_new_empty_workspace(client, monkeypatch):
     )
     assert cases.status_code == 200
     assert cases.json() == []
+
+
+def test_demo_session_uses_httponly_cookie(client):
+    client.cookies.clear()
+    response = client.post("/api/auth/demo")
+    assert response.status_code == 200
+    cookie = response.headers.get("set-cookie", "").lower()
+    assert "red_thread_session=" in cookie
+    assert "httponly" in cookie
+    assert "samesite" in cookie
+
+    me = client.get("/api/auth/me")
+    assert me.status_code == 200, me.text
+    assert me.json()["is_demo"] is True
+
+    logout = client.post("/api/auth/logout")
+    assert logout.status_code == 200
+    assert client.get("/api/auth/me").status_code == 401
+
+
+def test_demo_cases_are_copied_per_visitor(client, db):
+    from app.schemas.case import CaseCreate
+    from app.services import case_service
+
+    template = case_service.create_case(
+        db,
+        CaseCreate(title="Per Visitor Demo Template", description="Synthetic template."),
+        is_demo=True,
+    )
+    assert template.owner_id is None
+
+    client.cookies.clear()
+    first = client.post("/api/auth/demo")
+    assert first.status_code == 200, first.text
+    first_token = first.json()["token"]
+    first_headers = {"Authorization": f"Bearer {first_token}"}
+    first_cases = client.get("/api/cases", headers=first_headers).json()
+    first_copy = next(item for item in first_cases if item["title"] == template.title)
+    assert first_copy["id"] != template.id
+    assert first_copy["is_demo"] is True
+
+    client.cookies.clear()
+    second = client.post("/api/auth/demo")
+    assert second.status_code == 200, second.text
+    assert second.json()["user"]["id"] != first.json()["user"]["id"]
+    second_headers = {"Authorization": f"Bearer {second.json()['token']}"}
+    second_cases = client.get("/api/cases", headers=second_headers).json()
+    second_ids = {item["id"] for item in second_cases}
+    assert first_copy["id"] not in second_ids
+    assert any(item["title"] == template.title for item in second_cases)

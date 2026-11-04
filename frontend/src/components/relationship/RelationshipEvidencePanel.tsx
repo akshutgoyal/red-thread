@@ -5,10 +5,10 @@ import { useEvidence, useRelationship, useReviewRelationship } from "@/hooks/use
 import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { ClassificationBadge } from "@/components/ClassificationBadge";
 import { Textarea } from "@/components/ui/Field";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
 import { formatDateTime, humanize } from "@/lib/format";
-import { cn } from "@/lib/cn";
 
 export function RelationshipEvidencePanel({
   caseId,
@@ -93,9 +93,7 @@ export function RelationshipEvidencePanel({
       </div>
 
       <div className="flex flex-wrap gap-1.5">
-        <Badge className={cn("border-accent/30 bg-accent/10 text-accent")}>
-          {humanize(relationship.classification)}
-        </Badge>
+        <ClassificationBadge classification={relationship.classification} />
         <Badge className="border-line bg-surface-2 text-secondary">
           confidence: {relationship.confidence}
         </Badge>

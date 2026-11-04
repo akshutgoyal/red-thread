@@ -54,3 +54,38 @@ The startup demo seeder now detects incomplete demo cases. It preserves
 complete evidence and review/annotation history, uploads missing evidence, and
 re-parses evidence left in `uploaded` or failed states. It does not touch other
 cases.
+
+
+## Session security
+
+Sessions are stored in an **HttpOnly, SameSite cookie**. The browser never
+reads the session token. Cross-site production cookies are set with
+`SameSite=None; Secure`; local HTTP development uses `SameSite=Lax`.
+
+## Rate limits
+
+The API applies in-memory sliding-window limits per IP/session:
+
+- demo login: 3 per 10 minutes per IP
+- Google login: 10 per minute per IP
+- AI: 8 per minute per session/IP
+- report generation: 5 per 5 minutes
+- evidence uploads: 30 per minute
+- general API: 120 per minute
+
+Set `RED_THREAD_RATE_LIMIT_ENABLED=false` only for local testing. A multi-instance
+deployment should replace the in-memory limiter with a shared store.
+
+## AI budget
+
+`RED_THREAD_AI_BUDGET_USD` defaults to **0.50**. AI requests are rejected with
+HTTP 402 once recorded Isoquant usage reaches that estimated spend. This is an
+application-side budget guard; it is separate from the provider account
+balance, which should also be capped in the Isoquant console.
+
+## Per-visitor demo copies
+
+Each new demo visitor gets a deep copy of the synthetic demo cases, including
+evidence objects, events, entities, findings, relationships, provenance,
+reviews and reports. Demo visitors cannot see or change another visitor's
+copies. The original seed cases act as templates.

@@ -22,7 +22,7 @@ def create_case(
     case = case_service.create_case(
         db,
         payload,
-        owner_id=None if is_demo or principal is None else principal.user_id,
+        owner_id=principal.user_id if principal is not None else None,
         is_demo=is_demo,
     )
     audit_service.record(
@@ -43,8 +43,6 @@ def list_cases(
 ) -> list[CaseSummary]:
     if principal is None:
         cases = case_service.list_cases(db)
-    elif principal.is_demo:
-        cases = case_service.list_cases(db, is_demo=True)
     else:
         cases = case_service.list_cases(db, owner_id=principal.user_id)
     return [case_service.summarize_case(db, case) for case in cases]

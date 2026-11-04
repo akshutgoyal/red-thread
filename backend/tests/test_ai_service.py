@@ -641,3 +641,42 @@ def test_model_label_maps_deepseek_flash():
     assert model_label("deepseek-v4.1-flash-1017-fast") == "DeepSeek V4.1 Flash 1017 Fast"
     assert model_label("deepseek-v4.1-flash-1017") == "DeepSeek V4.1 Flash 1017"
     assert model_label("another-model") == "another-model"
+
+
+def test_isoquant_cost_estimation():
+    from app.config import get_settings
+    from app.services.ai_service import _estimate_ai_cost
+
+    settings = get_settings()
+    cost = _estimate_ai_cost("isoquant", 1_000_000, 0, 1_000_000, settings)
+    assert cost == settings.isoquant_input_cost_per_million + settings.isoquant_output_cost_per_million
+
+
+def test_ai_budget_blocks_requests(db, case):
+    import pytest
+    from app.config import get_settings
+    from app.models import AiQuery
+    from app.services.ai_service import AIError, ask_ai
+
+    spending = AiQuery(
+        case_id=case["id"],
+        question="prior",
+        provider="isoquant",
+        model="test",
+        answer="",
+        cost_usd=1.0,
+    )
+    db.add(spending)
+    db.commit()
+    settings = get_settings().model_copy(
+        update={
+            "ai_provider": "isoquant",
+            "isoquant_api_key": "test-key",
+            "ai_budget_usd": 0.5,
+        }
+    )
+    with pytest.raises(AIError) as error:
+        import asyncio
+
+        asyncio.run(ask_ai(db, case["id"], "new question", settings))
+    assert error.value.status_code == 402

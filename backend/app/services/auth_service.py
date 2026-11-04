@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import jwt
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -13,6 +13,7 @@ from ..config import Settings, get_settings
 from ..database import get_db
 from ..models import Case, User
 
+SESSION_COOKIE = "red_thread_session"
 PUBLIC_PATH_PREFIXES = ("/api/auth/", "/api/auth", "/api/health", "/docs", "/redoc", "/openapi.json")
 
 
@@ -27,6 +28,44 @@ class AuthPrincipal:
 
 def _settings() -> Settings:
     return get_settings()
+
+
+def _cookies_require_secure(request: Request, settings: Settings) -> bool:
+    forwarded = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip()
+    return (
+        forwarded == "https"
+        or request.url.scheme == "https"
+        or settings.environment == "production"
+    )
+
+
+def set_session_cookie(
+    response: Response,
+    token: str,
+    request: Request,
+    settings: Settings | None = None,
+) -> None:
+    settings = settings or _settings()
+    secure = _cookies_require_secure(request, settings)
+    response.set_cookie(
+        key=SESSION_COOKIE,
+        value=token,
+        max_age=settings.session_ttl_hours * 3600,
+        httponly=True,
+        secure=secure,
+        samesite="none" if secure else "lax",
+        path="/",
+    )
+
+
+def clear_session_cookie(response: Response, request: Request) -> None:
+    secure = _cookies_require_secure(request, _settings())
+    response.delete_cookie(
+        SESSION_COOKIE,
+        path="/",
+        secure=secure,
+        samesite="none" if secure else "lax",
+    )
 
 
 def create_session_token(principal: AuthPrincipal, settings: Settings | None = None) -> str:
@@ -62,13 +101,23 @@ def decode_session_token(token: str, settings: Settings | None = None) -> AuthPr
     )
 
 
-def get_principal(request: Request) -> AuthPrincipal | None:
-    """Return the authenticated principal, or None when auth is disabled."""
+def get_optional_principal(request: Request) -> AuthPrincipal | None:
     settings = _settings()
     authorization = request.headers.get("Authorization", "")
     token = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
+    if not token:
+        token = request.cookies.get(SESSION_COOKIE, "").strip()
     if token:
         return decode_session_token(token, settings)
+    return None
+
+
+def get_principal(request: Request) -> AuthPrincipal | None:
+    """Return the authenticated principal, or None when auth is disabled."""
+    settings = _settings()
+    principal = get_optional_principal(request)
+    if principal is not None:
+        return principal
     if settings.auth_required:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
     return None
@@ -106,7 +155,7 @@ def authorize_request(
     if case is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found.")
     if principal.is_demo:
-        allowed = case.is_demo
+        allowed = case.is_demo and case.owner_id == principal.user_id
     else:
         allowed = case.owner_id == principal.user_id
     if not allowed:
@@ -174,9 +223,10 @@ def principal_for_user(user: User) -> AuthPrincipal:
     )
 
 
-DEMO_PRINCIPAL = AuthPrincipal(
-    user_id="demo-user",
-    email="demo@red-thread.local",
-    name="Demo Investigator",
-    is_demo=True,
-)
+def demo_principal(user_id: str) -> AuthPrincipal:
+    return AuthPrincipal(
+        user_id=user_id,
+        email=f"{user_id}@demo.red-thread.local",
+        name="Demo Visitor",
+        is_demo=True,
+    )

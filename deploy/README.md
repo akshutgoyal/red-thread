@@ -351,3 +351,19 @@ VITE_GOOGLE_CLIENT_ID=<same-google-web-client-id>
 Add the Vercel production origin and `http://localhost:5173` as authorized
 JavaScript origins for the Google OAuth client. The demo button works without
 Google configuration. See `docs/AUTH.md`.
+
+
+## Cost and abuse controls
+
+Set the following in Render:
+
+```text
+RED_THREAD_RATE_LIMIT_ENABLED=true
+RED_THREAD_AI_BUDGET_USD=0.5
+```
+
+The AI budget is an application-side Isoquant spend guard. The Isoquant Console
+account balance is separate and should also be capped there. Sessions use
+HttpOnly cookies; Vercel and Render must retain their exact CORS origin
+configuration. Demo visitors receive isolated deep copies of the synthetic
+demo cases.

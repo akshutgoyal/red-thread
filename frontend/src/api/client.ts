@@ -69,6 +69,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     headers,
     body,
     cache: "no-store",
+    credentials: "include",
   });
 
   if (!response.ok) {
@@ -111,6 +112,7 @@ export const api = {
     }),
   loginDemo: () => request<import("@/types").AuthSession>("/auth/demo", { method: "POST" }),
   me: () => request<import("@/types").AuthUser>("/auth/me"),
+  logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
 
 
   listCases: () => request<CaseSummary[]>("/cases"),

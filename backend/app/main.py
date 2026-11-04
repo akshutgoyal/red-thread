@@ -10,6 +10,7 @@ from .api.router import api_router
 from .config import get_settings
 from .database import SessionLocal, init_db
 from .services.auth_service import authorize_request
+from .rate_limit import rate_limit_request
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -44,7 +45,7 @@ def create_app() -> FastAPI:
             "and human-reviewed findings."
         ),
         lifespan=lifespan,
-        dependencies=[Depends(authorize_request)],
+        dependencies=[Depends(authorize_request), Depends(rate_limit_request)],
     )
     application.add_middleware(
         CORSMiddleware,
