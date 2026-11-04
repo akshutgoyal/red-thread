@@ -3,12 +3,13 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .api.router import api_router
 from .config import get_settings
 from .database import SessionLocal, init_db
+from .services.auth_service import authorize_request
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -43,6 +44,7 @@ def create_app() -> FastAPI:
             "and human-reviewed findings."
         ),
         lifespan=lifespan,
+        dependencies=[Depends(authorize_request)],
     )
     application.add_middleware(
         CORSMiddleware,

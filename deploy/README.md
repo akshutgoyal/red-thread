@@ -330,3 +330,24 @@ In the browser:
   data-handling terms before using confidential material.
 - Reports are marked draft-only for human review and are not automatically court-admissible.
   Red Thread does not sign or attest a Section 63 BSA certificate.
+
+
+## Authentication variables
+
+Render:
+
+```text
+RED_THREAD_AUTH_REQUIRED=true
+RED_THREAD_SESSION_SECRET=<long-random-secret>
+GOOGLE_CLIENT_ID=<google-web-client-id>
+```
+
+Vercel:
+
+```text
+VITE_GOOGLE_CLIENT_ID=<same-google-web-client-id>
+```
+
+Add the Vercel production origin and `http://localhost:5173` as authorized
+JavaScript origins for the Google OAuth client. The demo button works without
+Google configuration. See `docs/AUTH.md`.

@@ -12,6 +12,7 @@ from .relationship import (
     ReviewDecision,
 )
 from .report import Report
+from .user import User
 
 __all__ = [
     "AiQuery",
@@ -28,5 +29,6 @@ __all__ = [
     "Relationship",
     "RelationshipSupport",
     "Report",
+    "User",
     "ReviewDecision",
 ]

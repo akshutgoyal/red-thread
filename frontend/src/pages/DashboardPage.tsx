@@ -7,6 +7,7 @@ import {
   FolderOpen,
   ListChecks,
   ShieldAlert,
+  Sparkles,
 } from "lucide-react";
 import {
   Bar,
@@ -21,6 +22,7 @@ import {
   YAxis,
 } from "recharts";
 import { useCaseContext } from "@/context/CaseContext";
+import { useAuth } from "@/context/AuthContext";
 import { useCase, useEvidence, useEvents, useFindings } from "@/hooks/useApi";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { StatCard } from "@/components/ui/StatCard";
@@ -43,6 +45,7 @@ const SEVERITY_COLORS: Record<string, string> = {
 export function DashboardPage() {
   const { cases, selectedCaseId, selectedCase, isLoading: casesLoading, error: casesError } =
     useCaseContext();
+  const { loginDemo } = useAuth();
   const caseQuery = useCase(selectedCaseId ?? undefined);
   const evidenceQuery = useEvidence(selectedCaseId ?? undefined);
   const eventsQuery = useEvents(selectedCaseId ?? undefined, { limit: 500 });
@@ -120,11 +123,20 @@ export function DashboardPage() {
           description="A case groups evidence, events, findings and reports. Create one to begin."
           icon={FolderOpen}
           action={
-            <Link to="/cases">
-              <Button variant="primary" icon={<FolderOpen size={15} />}>
-                Create a case
+            <div className="flex flex-wrap justify-center gap-2">
+              <Link to="/cases">
+                <Button variant="primary" icon={<FolderOpen size={15} />}>
+                  Create a case
+                </Button>
+              </Link>
+              <Button
+                variant="secondary"
+                icon={<Sparkles size={15} />}
+                onClick={() => void loginDemo()}
+              >
+                Explore demo
               </Button>
-            </Link>
+            </div>
           }
         />
       </div>

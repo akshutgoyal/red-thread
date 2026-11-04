@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -53,3 +53,25 @@ def init_db() -> None:
     from . import models  # noqa: F401  (register all mapped classes)
 
     Base.metadata.create_all(bind=engine)
+    _apply_lightweight_migrations()
+
+
+def _apply_lightweight_migrations() -> None:
+    """Add auth ownership columns to pre-auth databases without dropping data."""
+    inspector = inspect(engine)
+    if "cases" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("cases")}
+    statements: list[str] = []
+    if "owner_id" not in columns:
+        statements.append("ALTER TABLE cases ADD COLUMN owner_id VARCHAR(32)")
+    if "is_demo" not in columns:
+        statements.append("ALTER TABLE cases ADD COLUMN is_demo BOOLEAN NOT NULL DEFAULT FALSE")
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+        # Cases created before account ownership was introduced are the
+        # synthetic demos. New user-owned cases always have an owner_id.
+        connection.execute(
+            text("UPDATE cases SET is_demo = TRUE WHERE owner_id IS NULL")
+        )

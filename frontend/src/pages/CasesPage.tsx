@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FolderOpen, Plus, ShieldCheck } from "lucide-react";
+import { FolderOpen, Plus, ShieldCheck, Sparkles } from "lucide-react";
 import { useCaseContext } from "@/context/CaseContext";
+import { useAuth } from "@/context/AuthContext";
 import { useCreateCase } from "@/hooks/useApi";
 import { useToast } from "@/components/ui/Toast";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -17,6 +18,7 @@ export function CasesPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const { cases, isLoading, error, selectedCaseId, setSelectedCaseId } = useCaseContext();
+  const { loginDemo } = useAuth();
   const createCase = useCreateCase();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -67,9 +69,14 @@ export function CasesPage() {
           description="Create a case to group evidence, extracted events, findings and reports."
           icon={FolderOpen}
           action={
-            <Button variant="primary" icon={<Plus size={15} />} onClick={() => setOpen(true)}>
-              Create your first case
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button variant="primary" icon={<Plus size={15} />} onClick={() => setOpen(true)}>
+                Create your first case
+              </Button>
+              <Button variant="secondary" icon={<Sparkles size={15} />} onClick={() => void loginDemo()}>
+                Explore demo
+              </Button>
+            </div>
           }
         />
       ) : null}

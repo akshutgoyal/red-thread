@@ -15,8 +15,10 @@ import {
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useCaseContext } from "@/context/CaseContext";
+import { useAuth } from "@/context/AuthContext";
 import { useAiStatus, useHealth } from "@/hooks/useApi";
 import { cn } from "@/lib/cn";
+import { casePathForSelection } from "@/lib/caseNavigation";
 import { Badge } from "@/components/ui/Badge";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -43,6 +45,7 @@ const caseItems = [
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { cases, selectedCaseId, selectedCase, setSelectedCaseId } =
     useCaseContext();
+  const { user, loginDemo, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { data: health } = useHealth();
@@ -55,10 +58,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     setSelectedCaseId(nextCaseId);
     if (!nextCaseId) return;
 
-    const casePath = location.pathname.match(/^\/cases\/[^/]+(\/.*)?$/);
-    if (casePath) {
-      navigate(`/cases/${nextCaseId}${casePath[1] ?? ""}`);
-    }
+    const nextPath = casePathForSelection(location.pathname, nextCaseId);
+    if (nextPath) navigate(nextPath);
   }
 
   return (
@@ -141,6 +142,57 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           </div>
         </div>
       </nav>
+
+      <div className="border-t border-line px-4 py-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-xs font-medium text-primary">
+              {user?.name || user?.email || "Signed in"}
+            </p>
+            <p className="truncate text-[10px] text-muted">
+              {user?.is_demo ? "Demo workspace" : user?.email}
+            </p>
+          </div>
+          {user?.is_demo ? <Badge>Demo</Badge> : null}
+        </div>
+        <div className="mt-2 flex gap-2">
+          {user?.is_demo ? (
+            <button
+              type="button"
+              className="flex-1 rounded-lg border border-line px-2 py-1.5 text-[10px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent"
+              onClick={() => {
+                logout();
+                navigate("/login");
+              }}
+            >
+              Exit demo
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="flex-1 rounded-lg border border-line px-2 py-1.5 text-[10px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent"
+              onClick={async () => {
+                await loginDemo();
+                navigate("/");
+              }}
+            >
+              View demo
+            </button>
+          )}
+          {!user?.is_demo ? (
+            <button
+              type="button"
+              className="rounded-lg border border-line px-2 py-1.5 text-[10px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent"
+              onClick={() => {
+                logout();
+                navigate("/login");
+              }}
+            >
+              Sign out
+            </button>
+          ) : null}
+        </div>
+      </div>
 
       <div className="space-y-2 border-t border-line px-4 py-4 text-[10px] text-muted">
         <div className="flex items-center justify-between">

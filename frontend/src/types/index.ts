@@ -13,6 +13,7 @@ export interface CaseSummary {
   description: string;
   status: CaseStatus;
   investigator_notes: string;
+  is_demo: boolean;
   created_at: string;
   updated_at: string;
   evidence_count: number;
@@ -333,4 +334,18 @@ export interface ReconstructionResponse {
   spatial_observations: SpatialObservation[];
   generated_at: string;
   limitations: string[];
+}
+
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  picture: string | null;
+  is_demo: boolean;
+}
+
+export interface AuthSession {
+  token: string;
+  user: AuthUser;
 }

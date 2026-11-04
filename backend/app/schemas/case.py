@@ -29,6 +29,7 @@ class CaseRead(BaseModel):
     description: str
     status: str
     investigator_notes: str
+    is_demo: bool = False
     created_at: datetime
     updated_at: datetime
 

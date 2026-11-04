@@ -101,6 +101,46 @@ def _case_counts(db: Session, case_id: str) -> dict[str, int]:
     }
 
 
+def _repair_demo_case(
+    db: Session,
+    case: Case,
+    files: list[Path],
+    errors: list[dict[str, str]],
+) -> bool:
+    """Fill missing or unparsed evidence for an interrupted first boot.
+
+    Complete evidence and human review annotations are preserved. Other cases
+    are never touched.
+    """
+    repaired = False
+    if not case.is_demo:
+        case.is_demo = True
+        case.owner_id = None
+        repaired = True
+
+    existing = {
+        evidence.original_filename: evidence
+        for evidence in db.scalars(select(Evidence).where(Evidence.case_id == case.id))
+    }
+    for path in files:
+        try:
+            evidence = existing.get(path.name)
+            if evidence is None:
+                evidence = evidence_service.create_evidence(db, case, _as_upload(path))
+                existing[path.name] = evidence
+                repaired = True
+            if evidence.processing_status != "parsed":
+                investigation_service.parse_evidence(db, evidence)
+                repaired = True
+                logger.info("Demo seed repair: parsed %s", path.name)
+        except Exception as error:  # noqa: BLE001 - continue repairing other files
+            logger.exception("Demo seed repair: failed to process %s", path.name)
+            errors.append({"file": path.name, "error": str(error)})
+    if repaired:
+        db.commit()
+    return repaired
+
+
 def seed_demo_if_needed(db: Session, settings: Settings) -> dict[str, Any]:
     sample_root = settings.sample_data_dir
     if not sample_root.is_dir():
@@ -118,12 +158,30 @@ def seed_demo_if_needed(db: Session, settings: Settings) -> dict[str, Any]:
         title = spec["title"]
         existing = db.scalar(select(Case).where(Case.title == title))
         if existing is not None:
-            logger.info("Demo seed: case already exists: %s", title)
+            files = _sample_files(sample_root / spec["directory"])
+            repaired = _repair_demo_case(db, existing, files, errors)
+            if repaired:
+                logger.info("Demo seed: repaired incomplete case: %s", title)
+                db.refresh(existing)
+                counts = _case_counts(db, existing.id)
+                created.append(
+                    {
+                        "id": existing.id,
+                        "title": existing.title,
+                        "evidence_count": counts["evidence"],
+                        "event_count": counts["events"],
+                        "finding_count": counts["findings"],
+                        "repaired": True,
+                    }
+                )
+            else:
+                logger.info("Demo seed: case already complete: %s", title)
             continue
 
         case = case_service.create_case(
             db,
             CaseCreate(title=title, description=spec["description"]),
+            is_demo=True,
         )
         audit_service.record(
             db,

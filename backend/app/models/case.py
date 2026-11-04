@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String, Text
+from sqlalchemy import Boolean, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
@@ -24,6 +24,8 @@ class Case(Base, TimestampMixin):
     description: Mapped[str] = mapped_column(Text, default="", nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="open", nullable=False, index=True)
     investigator_notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    owner_id: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
 
     evidence: Mapped[list[Evidence]] = relationship(
         back_populates="case", cascade="all, delete-orphan"

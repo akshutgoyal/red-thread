@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..services.auth_service import AuthPrincipal, get_principal
 from ..dependencies import get_case_or_404
 from ..schemas.case import CaseCreate, CaseRead, CaseSummary, CaseUpdate
 from ..services import audit_service, case_service
@@ -12,8 +13,18 @@ router = APIRouter(prefix="/cases", tags=["cases"])
 
 
 @router.post("", response_model=CaseRead, status_code=status.HTTP_201_CREATED)
-def create_case(payload: CaseCreate, db: Session = Depends(get_db)) -> CaseRead:
-    case = case_service.create_case(db, payload)
+def create_case(
+    payload: CaseCreate,
+    db: Session = Depends(get_db),
+    principal: AuthPrincipal | None = Depends(get_principal),
+) -> CaseRead:
+    is_demo = bool(principal and principal.is_demo)
+    case = case_service.create_case(
+        db,
+        payload,
+        owner_id=None if is_demo or principal is None else principal.user_id,
+        is_demo=is_demo,
+    )
     audit_service.record(
         db,
         case.id,
@@ -26,8 +37,17 @@ def create_case(payload: CaseCreate, db: Session = Depends(get_db)) -> CaseRead:
 
 
 @router.get("", response_model=list[CaseSummary])
-def list_cases(db: Session = Depends(get_db)) -> list[CaseSummary]:
-    return [case_service.summarize_case(db, case) for case in case_service.list_cases(db)]
+def list_cases(
+    db: Session = Depends(get_db),
+    principal: AuthPrincipal | None = Depends(get_principal),
+) -> list[CaseSummary]:
+    if principal is None:
+        cases = case_service.list_cases(db)
+    elif principal.is_demo:
+        cases = case_service.list_cases(db, is_demo=True)
+    else:
+        cases = case_service.list_cases(db, owner_id=principal.user_id)
+    return [case_service.summarize_case(db, case) for case in cases]
 
 
 @router.get("/{case_id}", response_model=CaseSummary)

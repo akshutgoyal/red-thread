@@ -26,6 +26,12 @@ export const API_BASE = (
   import.meta.env.VITE_API_BASE_URL ?? "/api"
 ).replace(/\/+$/, "");
 
+let authToken: string | null = null;
+
+export function setAuthToken(token: string | null) {
+  authToken = token;
+}
+
 export class ApiError extends Error {
   status: number;
   detail: unknown;
@@ -47,6 +53,7 @@ interface RequestOptions {
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = { ...(options.headers ?? {}) };
+  if (authToken) headers.Authorization = `Bearer ${authToken}`;
   if (options.caseId) headers["X-Case-ID"] = options.caseId;
 
   let body: BodyInit | undefined;
@@ -97,6 +104,14 @@ function query(params: Record<string, string | number | boolean | undefined>): s
 
 export const api = {
   health: () => request<Health>("/health"),
+  loginGoogle: (credential: string) =>
+    request<import("@/types").AuthSession>("/auth/google", {
+      method: "POST",
+      body: { credential },
+    }),
+  loginDemo: () => request<import("@/types").AuthSession>("/auth/demo", { method: "POST" }),
+  me: () => request<import("@/types").AuthUser>("/auth/me"),
+
 
   listCases: () => request<CaseSummary[]>("/cases"),
   getCase: (caseId: string) => request<CaseSummary>(`/cases/${caseId}`),

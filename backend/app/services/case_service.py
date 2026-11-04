@@ -7,11 +7,19 @@ from ..models import Case, Event, Evidence, Finding
 from ..schemas.case import CaseCreate, CaseSummary, CaseUpdate
 
 
-def create_case(db: Session, payload: CaseCreate) -> Case:
+def create_case(
+    db: Session,
+    payload: CaseCreate,
+    *,
+    owner_id: str | None = None,
+    is_demo: bool = False,
+) -> Case:
     case = Case(
         title=payload.title.strip(),
         description=payload.description,
         investigator_notes=payload.investigator_notes,
+        owner_id=owner_id,
+        is_demo=is_demo,
     )
     db.add(case)
     db.commit()
@@ -19,8 +27,18 @@ def create_case(db: Session, payload: CaseCreate) -> Case:
     return case
 
 
-def list_cases(db: Session) -> list[Case]:
-    return list(db.scalars(select(Case).order_by(Case.created_at.desc())))
+def list_cases(
+    db: Session,
+    *,
+    owner_id: str | None = None,
+    is_demo: bool | None = None,
+) -> list[Case]:
+    statement = select(Case)
+    if is_demo is True:
+        statement = statement.where(Case.is_demo.is_(True))
+    elif owner_id:
+        statement = statement.where(Case.owner_id == owner_id)
+    return list(db.scalars(statement.order_by(Case.created_at.desc())))
 
 
 def get_case(db: Session, case_id: str) -> Case | None:
@@ -58,6 +76,7 @@ def summarize_case(db: Session, case: Case) -> CaseSummary:
         description=case.description,
         status=case.status,
         investigator_notes=case.investigator_notes,
+        is_demo=case.is_demo,
         created_at=case.created_at,
         updated_at=case.updated_at,
         evidence_count=evidence_count,

@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     r2_endpoint: str | None = Field(default=None, validation_alias="R2_ENDPOINT")
     r2_region: str = Field(default="auto", validation_alias="R2_REGION")
 
+    auth_required: bool = True
+    session_secret: str = "red-thread-dev-session-secret-change-me"
+    session_ttl_hours: int = 168
+    google_client_id: str | None = Field(default=None, validation_alias="GOOGLE_CLIENT_ID")
+
     auth_default_timezone: str = "UTC"
     default_timezone: str = "Asia/Kolkata"
     auth_default_year: int | None = None

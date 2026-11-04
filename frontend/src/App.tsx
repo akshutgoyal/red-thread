@@ -7,6 +7,9 @@ import {
   useParams,
 } from "react-router-dom";
 import { CaseProvider, useCaseContext } from "@/context/CaseContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { RequireAuth } from "@/components/auth/RequireAuth";
+import { LoginPage } from "@/pages/LoginPage";
 import { AppShell } from "@/components/layout/AppShell";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { CasesPage } from "@/pages/CasesPage";
@@ -22,6 +25,15 @@ import { ReportsPage } from "@/pages/ReportsPage";
 import { EntityExplorerPage } from "@/pages/EntityExplorerPage";
 import { SpatialPage } from "@/pages/SpatialPage";
 import { ReconstructionPage } from "@/pages/ReconstructionPage";
+
+function AuthenticatedLayout() {
+  const { user } = useAuth();
+  return (
+    <CaseProvider key={user?.id ?? "anonymous"}>
+      <AppShell />
+    </CaseProvider>
+  );
+}
 
 function CaseRouteLayout() {
   const { caseId } = useParams<{ caseId: string }>();
@@ -41,9 +53,16 @@ function CaseRouteLayout() {
 export function App() {
   return (
     <BrowserRouter>
-      <CaseProvider>
+      <AuthProvider>
         <Routes>
-          <Route element={<AppShell />}>
+          <Route path="login" element={<LoginPage />} />
+          <Route
+            element={
+              <RequireAuth>
+                <AuthenticatedLayout />
+              </RequireAuth>
+            }
+          >
             <Route index element={<DashboardPage />} />
             <Route path="cases" element={<CasesPage />} />
             <Route path="cases/:caseId" element={<CaseRouteLayout />}>
@@ -64,7 +83,7 @@ export function App() {
             <Route path="*" element={<DashboardPage />} />
           </Route>
         </Routes>
-      </CaseProvider>
+      </AuthProvider>
     </BrowserRouter>
   );
 }
