@@ -17,6 +17,16 @@ def _prepare_case(client, case, auth_log_bytes):
 
 def test_generate_json_and_pdf_reports(client, case, auth_log_bytes):
     evidence = _prepare_case(client, case, auth_log_bytes)
+    annotation = client.post(
+        f"/api/cases/{case['id']}/annotations",
+        json={
+            "target_type": "case",
+            "target_id": case["id"],
+            "author": "Investigator",
+            "note": "Verify the auth chronology before report approval.",
+        },
+    )
+    assert annotation.status_code == 201, annotation.text
 
     json_report = client.post(
         f"/api/cases/{case['id']}/reports", json={"report_type": "json"}
@@ -43,6 +53,10 @@ def test_generate_json_and_pdf_reports(client, case, auth_log_bytes):
     assert payload["limitations"]
     assert "DRAFT" in payload["limitations"][-1]
     assert payload["findings"]
+    assert payload["annotations"][0]["author"] == "Investigator"
+    assert payload["annotations"][0]["note"].startswith("Verify the auth chronology")
+    assert payload["review_decisions"] == []
+    assert "unresolved" in payload
 
     pdf_report = client.post(
         f"/api/cases/{case['id']}/reports", json={"report_type": "pdf"}

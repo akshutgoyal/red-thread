@@ -35,7 +35,7 @@ API keys, the database, or the local evidence/report directories.
   inactivity; wake it in the Supabase dashboard before a demo.
 - **Cloudflare R2 Free:** currently 10 GB-month storage, 1 million Class A and 10 million
   Class B operations, with no egress fees. The demo data is under 1 MB.
-- The two demo cases are recreated by an idempotent startup seed. This deployment does
+- The three demo cases are recreated by an idempotent startup seed. This deployment does
   **not** migrate the exact local case IDs, AI-query history or audit history. It recreates
   the same synthetic PhishTrace and benign-control content with new IDs.
 
@@ -147,26 +147,32 @@ Render. The container runs as a non-root user and listens on Render’s `$PORT`.
    comma-separated list and keep the Vercel origin too.
 
 Vercel bakes `VITE_API_BASE_URL` into the build. If the Render URL changes, update the
-Vercel variable and redeploy the frontend.
+Vercel variable and redeploy the frontend. The optional `VITE_MAP_TILE_URL` selects a local or
+neutral OpenStreetMap-compatible tile server for the spatial view; OSM is the default.
 
 ## 5. First boot and demo seed
 
 On the first Render startup with `RED_THREAD_SEED_DEMO=true`, the backend:
 
 1. Creates the Supabase tables.
-2. Creates the two synthetic cases if their exact titles are not already present.
+2. Creates the three synthetic cases if their exact titles are not already present.
 3. Uploads the sample evidence to R2.
 4. Runs the deterministic parsers and reconciliation.
 
 Expected result:
 
-| Case | Evidence | Events | Findings |
-|---|---:|---:|---:|
-| Operation PhishTrace (Synthetic Demo) | 6 | 69 | 17 |
-| Benign Control (Synthetic Demo) | 2 | 3 | 4 |
+| Case | Evidence | Notes |
+|---|---:|---|
+| Operation PhishTrace (Synthetic Demo) | 6 | Financial/chat/auth baseline |
+| Benign Control (Synthetic Demo) | 2 | No high/medium reconciliation anomaly |
+| Operation Digital Trail (Synthetic Demo) | 7 | PS3 multi-source, correlation, spatial and AI demo |
 
-The operation case is created last and therefore appears first in the case list. The seed
-is idempotent by case title: later restarts do not duplicate it.
+Counts for Digital Trail depend on the parser and correlation rules in the deployed commit.
+The service logs the actual `Demo seed result`; do not hardcode expected relationship totals in
+the application.
+
+The demos are additive. The seed is idempotent by case title: later restarts do not duplicate
+them, and the existing migrated PhishTrace/Benign cases are not deleted.
 
 The seed runs before the server accepts requests. On Render Free it can take a couple of
 minutes because of the PDF/image parsing and OCR. Watch the Render logs for
@@ -176,13 +182,14 @@ minutes because of the PDF/image parsing and OCR. Watch the Render logs for
 
 If a seed was partially created and you want to start clean:
 
-1. In the Supabase SQL editor, delete only the two synthetic cases:
+1. In the Supabase SQL editor, delete only the intended synthetic cases:
 
    ```sql
    delete from cases
    where title in (
      'Operation PhishTrace (Synthetic Demo)',
-     'Benign Control (Synthetic Demo)'
+     'Benign Control (Synthetic Demo)',
+     'Operation Digital Trail (Synthetic Demo)'
    );
    ```
 
@@ -248,7 +255,7 @@ local cases into Supabase and R2 instead, use the migration script.
    one-time migration if you want local development to stay on SQLite.
 
 6. The Render service can keep `RED_THREAD_SEED_DEMO=true`. The seed is idempotent by case
-   title and will skip the migrated cases.
+   title and will skip migrated cases; Operation Digital Trail is additive.
 
 The migration does not copy the local SQLite file itself, local venvs, or the old local report
 PDFs. The local database and evidence remain as a backup.
@@ -256,7 +263,7 @@ PDFs. The local database and evidence remain as a backup.
 ## 6. Public access
 
 The deployed demo has **no login, access code or user authentication**. The frontend, API,
-evidence, reports, audit data and AI endpoints are public. Use synthetic evidence only and never
+evidence, relationships, annotations, reports, audit data and AI endpoints are public. Use synthetic evidence only and never
 upload sensitive or real case material to a public URL.
 
 CORS is controlled by `RED_THREAD_CORS_ORIGINS`. Trailing slashes are normalized, so

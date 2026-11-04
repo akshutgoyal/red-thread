@@ -8,10 +8,12 @@ reconstructs timelines, identifies deterministic discrepancies, visualizes relat
 generates traceable reports. AI assistance is optional and evidence-grounded; the deterministic
 pipeline works without it.
 
-> **Status:** Working end-to-end implementation with a synthetic demonstration case. Backend:
-> 78 automated tests passing. Frontend: production build and lint passing. AI integration includes
-> mocked failure tests and a live DeepSeek V4.1 Flash verification via TokenHarbor with validated
-> citations. A managed deployment path (Vercel + Render + Supabase + Cloudflare R2) is included.
+> **Status:** PS3 multi-source investigation upgrade. Backend: **97 automated tests passing**.
+> Frontend: production build and lint passing. Three synthetic cases include Operation Digital
+> Trail (call, chat, email, GPS, CCTV, device and authentication records). The deterministic
+> pipeline, relationship provenance/review, reconstruction workspace, Leaflet spatial view and
+> evidence-grounded AI copilot are implemented. A managed deployment path (Vercel + Render +
+> Supabase + Cloudflare R2) is included.
 
 ---
 
@@ -21,19 +23,25 @@ pipeline works without it.
 - Stores uploaded evidence without modification and records a SHA-256 digest.
 - Recalculates hashes to verify stored-file integrity.
 - Parses SSH authentication logs, call logs, chats, UPI/bank transactions, invoices,
-  email, generic text/CSV/JSON, and images with optional OCR.
+  email CSV/EML, GPS CSV/GPX/KML, CCTV metadata, device logs, generic text/CSV/JSON, and
+  images with optional OCR and EXIF GPS.
 - Normalizes events and extracts entities (phones, VPAs, UTRs, IPs, usernames, invoice IDs,
   transaction IDs, filenames, URLs, emails).
-- Builds a cross-source relationship graph with exact matches, deterministic conflicts, and
-  clearly labelled heuristic leads.
+- Builds provenance-backed cross-source relationships and a Cytoscape graph with exact matches,
+  co-mentions, temporal/spatial leads, communication sequences, device/auth context and
+  deterministic conflicts. Every relationship carries support rows, source locators,
+  classification, confidence and review state.
 - Builds a unified timeline that preserves raw timestamps, inferred years, and timezone
   assumptions.
 - Runs deterministic reconciliation checks for amount discrepancies, payee mismatches, exact
   UTR matches, GST arithmetic, shared identifiers, and timestamp uncertainty.
 - Produces reviewable findings with severity, limitations, alternative explanations, and
   source locators.
-- Supports investigator review decisions and notes.
-- Generates PDF and JSON reports with hashes, provenance, findings, limitations, audit history,
+- Provides an Entity Explorer, relationship evidence panel, searchable/focusable graph,
+  timeline deep links, Leaflet spatial reconstruction, Reconstruction Workspace with review
+  queue and investigator annotations.
+- Generates PDF and JSON reports with hashes, provenance, relationships/support, spatial
+  observations, findings, unresolved questions, annotations, review decisions, audit history,
   and a draft-only Section 63 BSA preparation section.
 - Optionally answers investigator questions through CommandCode's DeepSeek V4.1 Flash endpoint
   or TokenHarbor's OpenAI-compatible endpoint, with citation validation.
@@ -56,15 +64,17 @@ pipeline works without it.
 ```
 React + Vite + TypeScript + Tailwind
   Dashboard · Cases · Evidence · Auth analysis · Timeline
-  Cytoscape relationship graph · Findings · AI assistant · Reports
+  Entity explorer · Cytoscape relationship graph · Spatial reconstruction
+  Reconstruction workspace · Findings · AI assistant · Reports
                               │
                          REST /api
                               │
 FastAPI + Pydantic + SQLAlchemy + SQLite
   Case service · Evidence service · Hashing service
   Parser registry → canonical events → entities
-  NetworkX correlation · Timeline · Reconciliation
-  ReportLab PDF/JSON reports · Optional AI adapter
+  Deterministic correlation → Relationship/Support/Review/Annotation
+  NetworkX graph view · Timeline · Leaflet spatial view · Reconstruction
+  ReportLab PDF/JSON reports · Optional grounded AI adapter
                               │
               data/evidence/<case_id>/<generated-name>
               data/red-thread.db
@@ -83,7 +93,8 @@ Vercel (React frontend)
 ```
 
 The API is stateless in deployed mode. Evidence and reports are private R2 objects; the API
-streams them through the access-gated endpoints. See [deploy/README.md](deploy/README.md).
+streams them through the application routes. The deployed demo is public and has no login.
+See [deploy/README.md](deploy/README.md).
 
 ### Frontend and theme
 
@@ -134,17 +145,18 @@ red-thread/
 │   │   ├── config.py                settings, Postgres/R2 configuration
 │   │   ├── database.py              SQLite/Postgres engine and session
 │   │   ├── dependencies.py          case scoping and access-token gate
-│   │   ├── models/                  SQLAlchemy models
+│   │   ├── models/                  SQLAlchemy models including relationships/support/review
 │   │   ├── schemas/                 Pydantic request/response models
-│   │   ├── api/                     health, cases, evidence, AI, reports
+│   │   ├── api/                     health, cases, evidence, relationships, analysis,
+│   │   │                            annotations, AI, reports
 │   │   ├── services/                evidence, storage, hashing, investigation,
-│   │   │                            correlation, reconciliation, AI, reports,
-│   │   │                            demo seed
+│   │   │                            relationship/correlation, reconciliation, analysis,
+│   │   │                            AI, reports, demo seed
 │   │   ├── parsers/                 canonical base, registry, auth adapter,
 │   │   │                            call/chat/transaction/invoice/email/
-│   │   │                            image/generic parsers
-│   │   └── utils/                   timestamps, amounts, identifiers
-│   ├── tests/                       78 backend tests
+│   │   │                            GPS/CCTV/device/image/generic parsers
+│   │   └── utils/                   timestamps, amounts, identifiers, geospatial
+│   ├── tests/                       97 backend tests
 │   ├── requirements.txt             runtime dependencies
 │   ├── requirements-dev.txt         test dependencies
 │   ├── requirements-ocr.txt         optional OCR dependencies
@@ -157,7 +169,8 @@ red-thread/
 │   │   ├── hooks/                   TanStack Query hooks
 │   │   ├── lib/                     formatting, severity and class helpers
 │   │   ├── pages/                   dashboard, cases, evidence, auth, timeline,
-│   │   │                            graph, findings, AI, reports
+│   │   │                            entities, graph, spatial, workspace,
+│   │   │                            findings, AI, reports
 │   │   └── types/                   shared TypeScript types
 │   ├── package.json
 │   ├── vercel.json                  Vite build and SPA rewrite
@@ -166,7 +179,8 @@ red-thread/
 │   ├── generate_sample_data.py      creates all synthetic demo files
 │   ├── manifest.json                synthetic file hashes
 │   ├── operation_phishtrace/        six synthetic evidence files
-│   └── benign_control/              legitimate invoice + UPI statement
+│   ├── benign_control/              legitimate invoice + UPI statement
+│   └── operation_digital_trail/     seven synthetic multi-source evidence files
 ├── scripts/
 │   └── seed_demo.py                 uploads and processes the demo via the API
 ├── docs/
@@ -175,6 +189,7 @@ red-thread/
 │   ├── AUTH_PARSER.md
 │   ├── DEMO.md
 │   ├── LIMITATIONS.md
+│   ├── OPERATION_DIGITAL_TRAIL.md
 │   └── WINDOWS.md
 ├── data/                            local-mode evidence and SQLite database
 ├── reports/                         local-mode generated reports
@@ -247,7 +262,7 @@ CSV/text files, and `manifest.json`.
 With the backend running:
 
 ```bash
-backend/.venv/bin/python scripts/seed_demo.py --include-benign
+backend/.venv/bin/python scripts/seed_demo.py --include-benign --digital-trail
 ```
 
 The script prints the case ID, parser results, findings, and the frontend URL. It does not call
@@ -257,7 +272,7 @@ AI.
 
 ```bash
 cd backend
-.venv/bin/pytest -q           # 78 passed
+.venv/bin/pytest -q           # 97 passed
 cd ../frontend
 npm run build                 # TypeScript + Vite production build
 ```
@@ -324,7 +339,7 @@ Open a third PowerShell window:
 ```powershell
 cd C:\red-thread
 .\backend\.venv\Scripts\python.exe sample_data\generate_sample_data.py
-.\backend\.venv\Scripts\python.exe scripts\seed_demo.py --include-benign
+.\backend\.venv\Scripts\python.exe scripts\seed_demo.py --include-benign --digital-trail
 ```
 
 ### 5. Tests
@@ -369,8 +384,8 @@ The managed free-tier deployment is documented in [deploy/README.md](deploy/READ
 
 The app remains local-first by default. Set `RED_THREAD_STORAGE_BACKEND=r2`, provide
 `RED_THREAD_DATABASE_URL` and the `R2_*` credentials, and set `RED_THREAD_SEED_DEMO=true` to create
-the two synthetic demo cases on startup. The seed is idempotent by case title. It creates the
-same PhishTrace and benign-control content with new case IDs. For the exact local snapshot,
+the three synthetic demo cases on startup. The seed is idempotent by case title. It creates the
+same PhishTrace, benign-control and Operation Digital Trail content with new case IDs. For the exact local snapshot,
 use `scripts/migrate_local_to_cloud.py` (see `deploy/README.md`, section 5b); it copies the
 local case IDs, records, audit/AI-query history and evidence, and regenerates Red Thread reports.
 
@@ -401,7 +416,7 @@ Copy `backend/.env.example` to `backend/.env` (or the project-root `.env`). Neve
 | `R2_BUCKET` | empty | Private R2 bucket name |
 | `R2_ENDPOINT` | derived | Optional explicit R2 endpoint |
 | `R2_REGION` | `auto` | R2 signing region |
-| `RED_THREAD_SEED_DEMO` | `false` | Idempotently create the two synthetic demo cases on startup |
+| `RED_THREAD_SEED_DEMO` | `false` | Idempotently create the three synthetic demo cases on startup |
 | `RED_THREAD_SAMPLE_DATA_DIR` | `<project>/sample_data` | Seed source directory |
 | `RED_THREAD_MAX_UPLOAD_MB` | `50` | Per-file upload limit |
 | `RED_THREAD_CORS_ORIGINS` | localhost dev origins | Comma-separated allowed frontend origins; trailing slashes are normalized |
@@ -614,22 +629,24 @@ See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) for the full limitation list.
 
 At the time of writing:
 
-- **Backend:** `78 passed` with `pytest -q`.
+- **Backend:** `97 passed` with `pytest -q`.
 - **Frontend:** `npm run build` completed successfully (TypeScript + Vite).
 - **Frontend lint:** `npm run lint` completed with 0 errors and 0 warnings.
-- The Vite production build is split into React, query, Cytoscape and Recharts vendor chunks.
+- The Vite production build is split into React, query, Cytoscape, Recharts and Leaflet
+  chunks.
 - **Storage tests:** local round-trip, path-traversal rejection, and an R2 adapter round-trip
   using a fake S3 client. The live R2 path is verified by the cloud migration below.
 - **Deployment-path verification:** a fresh SQLite/local-storage run with
-  `RED_THREAD_SEED_DEMO=true` recreated the two cases (Operation PhishTrace: 6 evidence, 69 events,
-  17 findings; Benign Control: 2 evidence, 3 events, 4 findings). The public API listed the
+  `RED_THREAD_SEED_DEMO=true` recreated the three cases (Operation PhishTrace: 6 evidence,
+  69 events, 17 findings; Benign Control: 2 evidence, 3 events, 4 findings; Operation Digital
+  Trail: 7 evidence, 20 events, 202 relationships). The public API listed the
   cases, and streamed evidence and report downloads worked. The browser loaded the screenshot
   preview and generated a report through the public API.
 - **Docker verification:** the Render image built successfully and ran as the non-root `red-thread`
   user. Health reported `database=ok` and `ocr_available=true`; the startup seed produced the same
-  two cases and counts inside the container.
+  the demo cases and counts inside the container.
 - **Postgres verification:** a temporary PostgreSQL 16 instance created the schema, seeded both
-  cases (Operation PhishTrace: 6/69/17; Benign Control: 2/3/4), generated a JSON report, and
+  cases including Operation Digital Trail (7 evidence, 20 events, 202 relationships), generated a JSON report, and
   returned the same counts through the API.
 - **Migration verification:** the resumable script copied the exact local data into a temporary
   PostgreSQL 16 + Moto S3 environment, then into the live Supabase project and real R2 bucket
@@ -649,7 +666,8 @@ At the time of writing:
   `deepseek-v4.1-flash:free`; a live question on the seeded case returned 20 citations, all 20
   validated, `validation_status=validated`, latency about 23.7 s. No API key is stored in the
   repository or reports.
-- **Demo integration:** the six synthetic Operation PhishTrace files were uploaded, parsed,
+- **Demo integration:** the seven synthetic Operation Digital Trail files were added through
+  the real upload/parse/reconcile pipeline; the original six PhishTrace files were also uploaded, parsed,
   reconciled, graphed, and reported; the benign control produced no high/medium reconciliation
   anomaly.
 - **UI verification:** light and dark themes were exercised in the browser on the dashboard,

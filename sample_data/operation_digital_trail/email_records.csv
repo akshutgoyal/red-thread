@@ -1,3 +1,3 @@
 from,to,subject,body,date,message_id,attachments
-nisha.rao@example.test,arjun.mehta@example.test,Central Junction site note,"Device DEV-DT-01 and phone +91-99001-12233 were recorded at Central Junction. Payment reference UTR-DT-778899. CCTV CAM-DT-01 covers the window.",2026-10-14T19:17:00+05:30,<dt-email-001@example.test>,cctv_note.pdf
-arjun.mehta@example.test,nisha.rao@example.test,Re: Central Junction site note,"Please confirm the device and the 19:00-19:20 camera recording.",2026-10-14T19:21:00+05:30,<dt-email-002@example.test>,
+nisha.rao@example.test,arjun.mehta@example.test,Central Junction site note,Device DEV-DT-01 and phone +91-99001-12233 were recorded at Central Junction. Payment reference UTR-DT-778899. CCTV CAM-DT-01 covers the window.,2026-10-14T19:17:00+05:30,<dt-email-001@example.test>,cctv_note.pdf
+arjun.mehta@example.test,nisha.rao@example.test,Re: Central Junction site note,Please confirm the device and the 19:00-19:20 camera recording.,2026-10-14T19:21:00+05:30,<dt-email-002@example.test>,

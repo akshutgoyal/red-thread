@@ -23,6 +23,7 @@ export const queryKeys = {
   findings: (caseId: string, filters?: Record<string, unknown>) =>
     ["findings", caseId, filters ?? {}] as const,
   audit: (caseId: string) => ["audit", caseId] as const,
+  annotations: (caseId: string) => ["annotations", caseId] as const,
   aiStatus: ["ai-status"] as const,
   reports: (caseId: string) => ["reports", caseId] as const,
 };
@@ -272,10 +273,21 @@ export function useAskAi(caseId: string) {
   });
 }
 
+export function useAnnotations(caseId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.annotations(caseId ?? ""),
+    queryFn: () => api.listAnnotations(caseId as string),
+    enabled: Boolean(caseId),
+  });
+}
+
 export function useCreateAnnotation(caseId: string) {
+  const client = useQueryClient();
   return useMutation({
     mutationFn: (payload: Parameters<typeof api.createAnnotation>[1]) =>
       api.createAnnotation(caseId, payload),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: queryKeys.annotations(caseId) }),
   });
 }
 

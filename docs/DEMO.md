@@ -2,7 +2,22 @@
 
 **All demo files are synthetic. They were generated for Red Thread and are not real evidence.**
 
-## Story
+## Start here: Operation Digital Trail (PS3)
+
+The multi-source demo is documented in
+[OPERATION_DIGITAL_TRAIL.md](./OPERATION_DIGITAL_TRAIL.md). It adds call, chat, email, GPS, CCTV,
+device and authentication evidence and produces the cross-source graph, spatial view, review
+queue, AI grounding and report required by the PS3 acceptance flow.
+
+```bash
+backend/.venv/bin/python sample_data/generate_sample_data.py
+backend/.venv/bin/python scripts/seed_demo.py --include-benign --digital-trail
+```
+
+Open the printed Operation Digital Trail case. The historic PhishTrace and benign-control
+walkthroughs below remain available.
+
+## Operation PhishTrace story
 
 A victim receives a call from `+91-98765-43210` and a chat demand for `INR 45,000`. The sender
 attaches an invoice (`INV-2026-9912`) claiming the UPI ID `gov-security@upi`. A payment

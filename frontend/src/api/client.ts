@@ -11,6 +11,7 @@ import type {
   FindingListResponse,
   GraphResponse,
   HashVerifyResponse,
+  InvestigatorAnnotation,
   Health,
   ParseResponse,
   ReconstructionResponse,
@@ -231,6 +232,8 @@ export const api = {
       caseId,
       body: payload,
     }),
+  listAnnotations: (caseId: string) =>
+    request<InvestigatorAnnotation[]>(`/cases/${caseId}/annotations`, { caseId }),
   createAnnotation: (
     caseId: string,
     payload: {
@@ -240,7 +243,7 @@ export const api = {
       note: string;
     },
   ) =>
-    request<unknown>(`/cases/${caseId}/annotations`, {
+    request<InvestigatorAnnotation>(`/cases/${caseId}/annotations`, {
       method: "POST",
       caseId,
       body: payload,

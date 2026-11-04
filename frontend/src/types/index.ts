@@ -282,6 +282,17 @@ export interface RelationshipListResponse {
   total: number;
 }
 
+export interface InvestigatorAnnotation {
+  id: string;
+  case_id: string;
+  target_type: string;
+  target_id: string;
+  author: string;
+  note: string;
+  created_at: string;
+}
+
+
 export interface EntityDetail {
   entity: EntityRecord;
   events: EventRecord[];

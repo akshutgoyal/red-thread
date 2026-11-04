@@ -1,19 +1,25 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Bot, GitBranch, Layers } from "lucide-react";
-import { useReconstruction } from "@/hooks/useApi";
+import { AlertTriangle, ArrowRight, Bot, GitBranch, Layers, MessageSquarePlus } from "lucide-react";
+import { useAnnotations, useCreateAnnotation, useReconstruction } from "@/hooks/useApi";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
+import { Textarea } from "@/components/ui/Field";
+import { useToast } from "@/components/ui/Toast";
 import { RelationshipEvidencePanel } from "@/components/relationship/RelationshipEvidencePanel";
 import { formatDateTime, humanize } from "@/lib/format";
 
 export function ReconstructionPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const reconstructionQuery = useReconstruction(caseId);
+  const annotationsQuery = useAnnotations(caseId);
+  const createAnnotation = useCreateAnnotation(caseId ?? "");
+  const toast = useToast();
   const [selectedRelationshipId, setSelectedRelationshipId] = useState<string | null>(null);
+  const [note, setNote] = useState("");
 
   if (!caseId) return <ErrorState title="Missing case ID" />;
   if (reconstructionQuery.isLoading) return <LoadingState label="Building reconstruction…" />;
@@ -27,6 +33,30 @@ export function ReconstructionPage() {
 
   const data = reconstructionQuery.data;
   if (!data) return <EmptyState title="No reconstruction available" description="Parse evidence first." />;
+  const reviewQueue = data.relationships.filter((relationship) =>
+    ["unreviewed", "needs_review", "needs_more_evidence"].includes(relationship.review_status),
+  );
+
+  function addAnnotation() {
+    const trimmed = note.trim();
+    if (!caseId || !trimmed) return;
+    createAnnotation.mutate(
+      {
+        target_type: "case",
+        target_id: caseId,
+        author: "Investigator",
+        note: trimmed,
+      },
+      {
+        onSuccess: () => {
+          setNote("");
+          toast.push("success", "Annotation added");
+        },
+        onError: (error) =>
+          toast.push("error", "Could not add annotation", error.message),
+      },
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -162,6 +192,38 @@ export function ReconstructionPage() {
 
         <div className="space-y-5">
           <Card>
+            <CardHeader
+              title="Review queue"
+              subtitle="Relationships that still need an investigator decision."
+              action={<Badge>{reviewQueue.length}</Badge>}
+            />
+            <CardBody className="space-y-2">
+              {reviewQueue.length === 0 ? (
+                <p className="text-xs text-muted">No relationships are waiting for review.</p>
+              ) : (
+                reviewQueue.slice(0, 12).map((relationship) => (
+                  <button
+                    key={relationship.id}
+                    type="button"
+                    onClick={() => setSelectedRelationshipId(relationship.id)}
+                    className="w-full rounded-lg border border-line bg-surface-2/40 px-3 py-2 text-left transition-colors hover:border-accent/30"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-[11px] font-medium text-primary">
+                        {humanize(relationship.relationship_type)}
+                      </span>
+                      <Badge>{humanize(relationship.review_status)}</Badge>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-[10px] text-secondary">
+                      {relationship.explanation}
+                    </p>
+                  </button>
+                ))
+              )}
+            </CardBody>
+          </Card>
+
+          <Card>
             <CardHeader title="Unresolved questions" subtitle="What still needs investigator attention." />
             <CardBody className="space-y-2">
               {data.unresolved.length === 0 ? (
@@ -242,6 +304,73 @@ export function ReconstructionPage() {
           </Card>
         </div>
       </div>
+
+      <Card className="mt-5">
+        <CardHeader
+          title="Investigator annotations"
+          subtitle="Human notes are stored separately from deterministic evidence and audit-logged."
+          action={<Badge>{annotationsQuery.data?.length ?? 0}</Badge>}
+        />
+        <CardBody className="space-y-4">
+          {annotationsQuery.isLoading ? (
+            <LoadingState label="Loading annotations…" />
+          ) : annotationsQuery.data?.length ? (
+            <div className="space-y-2">
+              {annotationsQuery.data.map((annotation) => (
+                <div
+                  key={annotation.id}
+                  className="rounded-lg border border-line bg-surface-2/40 p-3"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Badge>{humanize(annotation.target_type)}</Badge>
+                      <span className="text-[10px] text-muted">
+                        {annotation.author || "Investigator"}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-muted">
+                      {formatDateTime(annotation.created_at)}
+                    </span>
+                  </div>
+                  <p className="mt-2 whitespace-pre-line text-[11px] leading-relaxed text-secondary">
+                    {annotation.note}
+                  </p>
+                  <p className="mt-1 font-mono text-[9px] text-muted">
+                    target: {annotation.target_type}:{annotation.target_id}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted">No investigator annotations yet.</p>
+          )}
+
+          <div className="rounded-xl border border-line bg-surface-2/40 p-3">
+            <Textarea
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="Add a case note, follow-up task or review caveat…"
+              rows={3}
+              className="text-xs"
+            />
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <p className="text-[10px] text-muted">
+                Annotations are attributable and included in the audit trail and reports.
+              </p>
+              <Button
+                size="sm"
+                variant="primary"
+                icon={<MessageSquarePlus size={13} />}
+                loading={createAnnotation.isPending}
+                disabled={!note.trim()}
+                onClick={addAnnotation}
+              >
+                Add annotation
+              </Button>
+            </div>
+          </div>
+        </CardBody>
+      </Card>
     </div>
   );
 }

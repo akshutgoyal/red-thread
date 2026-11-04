@@ -35,7 +35,7 @@ const caseItems = [
   { suffix: "/spatial", label: "Spatial reconstruction", icon: Map },
   { suffix: "/auth", label: "Auth analysis", icon: ShieldCheck },
   { suffix: "/findings", label: "Findings", icon: ListChecks },
-  { suffix: "/reconstruction", label: "Reconstruction", icon: Sparkles },
+  { suffix: "/workspace", label: "Workspace", icon: Sparkles },
   { suffix: "/ai", label: "AI assistant", icon: Bot },
   { suffix: "/reports", label: "Reports", icon: FileSearch },
 ];

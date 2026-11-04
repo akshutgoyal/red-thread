@@ -53,6 +53,7 @@ export function App() {
               <Route path="spatial" element={<SpatialPage />} />
               <Route path="findings" element={<FindingsPage />} />
               <Route path="reconstruction" element={<ReconstructionPage />} />
+              <Route path="workspace" element={<ReconstructionPage />} />
               <Route path="ai" element={<AiAssistantPage />} />
               <Route path="reports" element={<ReportsPage />} />
             </Route>

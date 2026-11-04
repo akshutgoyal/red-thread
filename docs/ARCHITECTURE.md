@@ -9,8 +9,9 @@
 | Persistence | SQLAlchemy, SQLite or Postgres/Supabase | Cases, evidence, events, entities, findings, reports, audit, AI queries |
 | File storage | Local filesystem or Cloudflare R2 | Evidence bytes and generated report files |
 | Processing | Python standard library, pandas, pdfplumber, Pillow/pytesseract | Parsing, extraction, hashing, optional OCR |
-| Correlation | NetworkX | In-memory relationship graph and evidence links |
-| Reporting | ReportLab | PDF and JSON exports |
+| Correlation | Deterministic Python rules + NetworkX | Persisted relationship/support provenance and graph projection |
+| Spatial | Leaflet + documented coordinates | GPS/CCTV observation map; no inferred routes |
+| Reporting | ReportLab | PDF and JSON exports with reviews, annotations and audit |
 | AI | CommandCode Provider API or TokenHarbor | Optional evidence-grounded answers |
 
 ## Local and deployed modes
@@ -20,10 +21,11 @@ for metadata and private Cloudflare R2 objects for evidence/reports. The API is 
 Render’s ephemeral filesystem is not the system of record. `storage_service` maps keys such as
 `evidence/<case_id>/<file>` and `reports/<case_id>/<file>` to either the local roots or R2.
 Parsers materialize an R2 object to a temporary file, parse it, and remove the temporary copy.
-The access-gated content and download endpoints stream bytes from local storage or R2.
+The content and download endpoints stream bytes from local storage or R2.
 
-A startup seed (`RED_THREAD_SEED_DEMO=true`) creates the two synthetic demo cases in the configured
-database and storage. It is idempotent by case title. The deployment guide is
+A startup seed (`RED_THREAD_SEED_DEMO=true`) creates three synthetic demo cases in the configured
+database and storage: Operation PhishTrace, Benign Control and Operation Digital Trail. It is
+idempotent by case title and additive. The deployment guide is
 [deploy/README.md](../deploy/README.md).
 
 ## Request flow: evidence upload
@@ -89,9 +91,16 @@ parser version, and creation time.
 Exact matching uses the normalized value. The original value remains available in the UI and
 reports. Fuzzy similarity is not used to merge entities.
 
-## Relationship graph
+## Persisted relationships and graph
 
-NetworkX builds an in-memory `MultiDiGraph` on request. Node IDs use stable prefixes:
+The deterministic correlation engine writes `Relationship` records with rule, explanation,
+classification, confidence and review state, plus `RelationshipSupport` rows that resolve to
+real evidence, events, findings and source locators. `ReviewDecision` and
+`InvestigatorAnnotation` capture human decisions and notes. The legacy `GraphEdge` rows remain
+available; an idempotent backfill materializes them as relationships.
+
+NetworkX projects the stored relationships and evidence/entity links into an in-memory
+`MultiDiGraph` for the graph page. Node IDs use stable prefixes:
 
 - `evidence:<id>`
 - `event:<id>`
@@ -109,8 +118,10 @@ Edge classes:
 | `payee_conflict` | conflict | Deterministic payee mismatch |
 | `temporal_proximity` | heuristic | Timestamps close; explicitly a lead, not proof |
 
-Persisted edges from reconciliation are merged into the graph. Temporal edges are computed only
-when `include_temporal=true` and are never persisted as findings.
+Persisted relationships are merged into the graph. Exact identifier matches, co-mentions,
+temporal associations, spatial proximity, communication sequences, device/auth context and
+CCTV coverage gaps retain their own classification and support. Temporal and spatial links are
+investigative leads, not findings or proof.
 
 ## Reconciliation checks
 
@@ -132,12 +143,14 @@ reconciliation.
 ## Database tables
 
 `cases`, `evidence`, `events`, `entities`, `event_entities`, `findings`, `finding_evidence`,
-`graph_edges`, `audit_events`, `ai_queries`, `reports`.
+`graph_edges`, `audit_events`, `ai_queries`, `reports`, and the additive
+`relationships`, `relationship_supports`, `review_decisions`, `investigator_annotations` tables.
+Schema creation is additive through `Base.metadata.create_all`; no existing table is dropped.
 
 The database schema is created with `Base.metadata.create_all` during the FastAPI lifespan.
 To reset a local development database, stop the backend and remove `data/red-thread.db` and
-`data/evidence/`. To reset the deployed demo, delete the two synthetic cases in Supabase and
-their R2 prefixes; see [deploy/README.md](../deploy/README.md).
+`data/evidence/`. To reset a synthetic demo, delete only its cases in Supabase and their R2 prefixes; see
+[deploy/README.md](../deploy/README.md). Do not delete unrelated cases.
 
 ## Security boundaries
 
@@ -145,8 +158,9 @@ their R2 prefixes; see [deploy/README.md](../deploy/README.md).
 - Stored names are generated; original names are metadata only.
 - `evidence_service.get_evidence_path` resolves paths and rejects anything outside the evidence
   root.
-- Evidence, finding and report routes validate case ownership.
-- The deployed API is public; `RED_THREAD_CORS_ORIGINS` controls which browser origins may call it.
+- Evidence, finding, relationship, annotation and report routes validate case ownership.
+- The deployed API is public with no login; `RED_THREAD_CORS_ORIGINS` controls which browser
+  origins may call it. Use synthetic data only.
 - AI keys remain backend-only.
 - Reports expose relative identifiers, never arbitrary server paths.
 
@@ -178,3 +192,21 @@ their R2 prefixes; see [deploy/README.md](../deploy/README.md).
   collapses Type/Uploaded below `2xl` (full details remain in the drawer); buttons use
   `whitespace-nowrap`; all controls expose focus-visible rings.
 - `prefers-reduced-motion` disables transitions and animations.
+
+
+## PS3 investigation surfaces
+
+| Route | Purpose |
+|---|---|
+| `GET /cases/{id}/entities` and `/entities/{entity_id}` | Entity explorer with mentions, sources and relationships |
+| `GET /cases/{id}/relationships` and `/relationships/{id}` | Provenance-backed relationship browsing |
+| `POST /relationships/{id}/review` | Accept/reject/needs-review/needs-evidence with audit |
+| `GET/POST /cases/{id}/annotations` | Investigator notes, included in reports and audit |
+| `GET /cases/{id}/spatial` | Documented GPS/CCTV coordinates only |
+| `GET /cases/{id}/reconstruction` | Deterministic case summary, conflicts and unresolved questions |
+| `POST /cases/{id}/ai/ask` | Optional grounded AI with `focus_type`/`focus_id` |
+
+Frontend routes include `/entities`, `/graph`, `/timeline`, `/spatial`, `/workspace` and `/ai`.
+The spatial view uses Leaflet with a configurable tile URL (`VITE_MAP_TILE_URL`); the default
+demonstration uses OpenStreetMap tiles and only documented coordinates. Reports are draft-only
+and require human review.

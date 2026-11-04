@@ -1,12 +1,19 @@
 {
   "warning": "SYNTHETIC DEMO DATA. Not real evidence.",
   "files": {
-    "benign_control/invoice_legit.pdf": "a78a39db95cbe9e30c76fce8f960bfdc352a95764a4bf58039d6dd56a7cd3105",
+    "benign_control/invoice_legit.pdf": "59f8dad43adbca21c7b1b1a77f301b8425584268d60ebc789903fc7b5dd80f0d",
     "benign_control/upi_statement.csv": "86098436213eaef75d7d6721d2daa2c8e720292b290acc8cf92bc4978652c3d8",
+    "operation_digital_trail/auth.log": "e05a2643047693cf863456bfa36aaae6c1d47e7ad2363ce9d1ca2fee228bb64b",
+    "operation_digital_trail/call_log.csv": "9d05ac0305e7844ffb49a882dac03f2126d5e00a6e20550f5ad500c3c2d7edf2",
+    "operation_digital_trail/cctv_metadata.csv": "bb1c088d37b6abf88c245dba9de765331f8a7b7203461adc5b08cb085311e4f8",
+    "operation_digital_trail/chat_export.txt": "0c7d8c516011675f0d50759fa1710db95b7d27a29f34e778a3dda313208c0003",
+    "operation_digital_trail/device_log.csv": "c98993a0121c418fc7ba602c5e4692818cc3d6620959a804b6cc062dca7d5ea9",
+    "operation_digital_trail/email_records.csv": "3749edb49a4795d54e07edcbfb3f2560200e86f6ce07fd222e4ebe36cc4fa807",
+    "operation_digital_trail/gps_records.csv": "f82afbc4198b952c61ee94a13fe8830b714c08ffe13cec327d65b7494b80c4b6",
     "operation_phishtrace/auth.log": "92770dd32d928e51b2e5da50c9eca6c6cc0e6a7cffcbb4b7bc322bcadf55cec4",
     "operation_phishtrace/call_log.csv": "0b13874f715d4aa336c34ce81b480da970d5ad481d1b4038c91e8746d3ba4813",
     "operation_phishtrace/chat_export.txt": "0483770b63969ac133f515bfeb3f36163436b956a01c5c4b89b958ffedd357ef",
-    "operation_phishtrace/invoice_45000.pdf": "efd9030a734971c1c3ab8b4e0d2c99c3bce93664249d3762d9985bc9acf653cb",
+    "operation_phishtrace/invoice_45000.pdf": "40a9750a09dc3337c5eb55cfecc8a3bd38b2c2a78eeff06a818b0c35225ae18c",
     "operation_phishtrace/payment_screenshot.png": "8648252cd2f941513d77adac2609b9d2cc1473e955c88c0fc05d4624634722ee",
     "operation_phishtrace/upi_transaction_log.csv": "495d908beae06766e02ec9ed7c6c7b48561398f064960a526dba56f7fb0e1775"
   }

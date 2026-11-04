@@ -34,6 +34,8 @@ MEDIA_TYPES = {
     ".png": "image/png",
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
+    ".gpx": "application/gpx+xml",
+    ".kml": "application/vnd.google-earth.kml+xml",
 }
 
 OPERATION_FILES = [
@@ -45,6 +47,15 @@ OPERATION_FILES = [
     "auth.log",
 ]
 BENIGN_FILES = ["invoice_legit.pdf", "upi_statement.csv"]
+DIGITAL_TRAIL_FILES = [
+    "call_log.csv",
+    "chat_export.txt",
+    "email_records.csv",
+    "gps_records.csv",
+    "cctv_metadata.csv",
+    "device_log.csv",
+    "auth.log",
+]
 
 
 def wait_for_backend(client: httpx.Client, attempts: int = 20) -> None:
@@ -158,6 +169,11 @@ def main() -> int:
         default="Operation PhishTrace (Synthetic Demo)",
     )
     parser.add_argument("--include-benign", action="store_true")
+    parser.add_argument(
+        "--digital-trail",
+        action="store_true",
+        help="Also seed the multi-source Operation Digital Trail demo.",
+    )
     args = parser.parse_args()
 
     if not SAMPLE_ROOT.exists():
@@ -185,6 +201,18 @@ def main() -> int:
                 ),
                 directory=SAMPLE_ROOT / "benign_control",
                 files=BENIGN_FILES,
+            )
+        if args.digital_trail:
+            seed_case(
+                client,
+                title="Operation Digital Trail (Synthetic Demo)",
+                description=(
+                    "Synthetic PS3 demonstration with call, chat, email, GPS, CCTV, "
+                    "authentication and device records. All records are fictional and "
+                    "correlations are investigative leads, not proof."
+                ),
+                directory=SAMPLE_ROOT / "operation_digital_trail",
+                files=DIGITAL_TRAIL_FILES,
             )
         print(f"\nOperation case ID: {operation_id}")
     return 0

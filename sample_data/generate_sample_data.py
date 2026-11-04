@@ -25,6 +25,7 @@ from reportlab.pdfgen import canvas
 ROOT = Path(__file__).resolve().parent
 OPERATION = ROOT / "operation_phishtrace"
 BENIGN = ROOT / "benign_control"
+DIGITAL = ROOT / "operation_digital_trail"
 
 
 def sha256(path: Path) -> str:
@@ -310,6 +311,117 @@ def build_operation() -> None:
     write_lines(OPERATION / "auth.log", auth_lines)
 
 
+def build_digital_trail() -> None:
+    """Generate the additive PS3 multi-source demonstration."""
+    DIGITAL.mkdir(parents=True, exist_ok=True)
+
+    write_csv(
+        DIGITAL / "call_log.csv",
+        [
+            "timestamp_raw",
+            "caller_id",
+            "receiver_id",
+            "call_type",
+            "duration_sec",
+            "cell_tower_id",
+            "device_id",
+        ],
+        [
+            ["2026-10-14 18:59:00 IST", "+91-99001-12233", "+91-99004-45566", "OUTGOING", "42", "CENTRAL-01", "DEV-DT-01"],
+            ["2026-10-14 19:12:00 IST", "+91-99004-45566", "+91-99001-12233", "INCOMING", "85", "CENTRAL-01", "DEV-DT-01"],
+            ["2026-10-14 19:24:00 IST", "+91-99007-78899", "+91-99001-12233", "OUTGOING", "30", "SOUTH-02", "DEV-DT-02"],
+        ],
+    )
+    write_lines(
+        DIGITAL / "chat_export.txt",
+        [
+            "[2026-10-14, 19:02:00 IST] +91-99001-12233: I am at Central Junction with DEV-DT-01.",
+            "[2026-10-14, 19:06:00 IST] +91-99004-45566: Keep the device with you. CCTV CAM-DT-01 is at the junction.",
+            "[2026-10-14, 19:18:00 IST] +91-99004-45566: Sent the invoice to nisha.rao@example.test. Reference UTR-DT-778899.",
+            "[2026-10-14, 19:23:00 IST] +91-99001-12233: I see a login alert from 198.51.100.77.",
+        ],
+    )
+    write_csv(
+        DIGITAL / "email_records.csv",
+        ["from", "to", "subject", "body", "date", "message_id", "attachments"],
+        [
+            [
+                "nisha.rao@example.test",
+                "arjun.mehta@example.test",
+                "Central Junction site note",
+                "Device DEV-DT-01 and phone +91-99001-12233 were recorded at Central Junction. Payment reference UTR-DT-778899. CCTV CAM-DT-01 covers the window.",
+                "2026-10-14T19:17:00+05:30",
+                "<dt-email-001@example.test>",
+                "cctv_note.pdf",
+            ],
+            [
+                "arjun.mehta@example.test",
+                "nisha.rao@example.test",
+                "Re: Central Junction site note",
+                "Please confirm the device and the 19:00-19:20 camera recording.",
+                "2026-10-14T19:21:00+05:30",
+                "<dt-email-002@example.test>",
+                "",
+            ],
+        ],
+    )
+    write_csv(
+        DIGITAL / "gps_records.csv",
+        ["timestamp", "device_id", "latitude", "longitude", "place", "accuracy_m"],
+        [
+            ["2026-10-14T19:04:00+05:30", "DEV-DT-01", "12.9716", "77.5946", "Central Junction", "8"],
+            ["2026-10-14T19:16:00+05:30", "DEV-DT-01", "12.9720", "77.5950", "Central Junction", "7"],
+            ["2026-10-14T19:26:00+05:30", "DEV-DT-02", "12.9352", "77.6245", "South Gate", "12"],
+        ],
+    )
+    write_csv(
+        DIGITAL / "cctv_metadata.csv",
+        ["camera_id", "site_name", "latitude", "longitude", "recording_start", "recording_end", "file", "status"],
+        [
+            ["CAM-DT-01", "Central Junction", "12.9717", "77.5947", "2026-10-14T19:00:00+05:30", "2026-10-14T19:20:00+05:30", "cam_dt_01.mp4", "available"],
+            ["CAM-DT-02", "South Gate", "12.9353", "77.6246", "2026-10-14T19:20:00+05:30", "2026-10-14T19:40:00+05:30", "cam_dt_02.mp4", "available"],
+        ],
+    )
+    write_csv(
+        DIGITAL / "device_log.csv",
+        ["timestamp", "device_id", "imei", "msisdn", "ip", "event", "account"],
+        [
+            ["2026-10-14T19:01:00+05:30", "DEV-DT-01", "356938035643809", "+91-99001-12233", "198.51.100.77", "device_seen", "arjun"],
+            ["2026-10-14T19:15:00+05:30", "DEV-DT-01", "356938035643809", "+91-99001-12233", "198.51.100.77", "device_seen", "arjun"],
+            ["2026-10-14T19:25:00+05:30", "DEV-DT-02", "356938035643810", "+91-99004-45566", "203.0.113.24", "device_seen", "nisha"],
+        ],
+    )
+    write_lines(
+        DIGITAL / "auth.log",
+        [
+            "2026-10-14T19:22:01Z edge-node sshd[2211]: Failed password for invalid user visitor from 198.51.100.77 port 51422 ssh2",
+            "2026-10-14T19:22:08Z edge-node sshd-session[2212]: Accepted password for arjun from 198.51.100.77 port 51424 ssh2",
+            "2026-10-14T19:23:10Z edge-node sshd[2211]: Accepted password for nisha from 203.0.113.24 port 51425 ssh2",
+        ],
+    )
+    (DIGITAL / "README.md").write_text(
+        """# Operation Digital Trail (Synthetic Demo)
+
+All records in this directory are fictional and generated for testing only. They are not real
+evidence and must not be used as a representation of any person, device or location.
+
+## Intended correlations
+
+- Phone `+91-99001-12233` appears in call, chat, email and device records.
+- Device `DEV-DT-01` / IMEI `356938035643809` appears in call, GPS and device records.
+- IP `198.51.100.77` appears in authentication and device records.
+- UTR `UTR-DT-778899` appears in chat and email records.
+- GPS observations at Central Junction and CCTV camera `CAM-DT-01` document a shared time and
+  location window.
+- The authentication records provide a chronology around the device activity.
+
+The graph edges are generated by the deterministic correlation engine from the parsed records.
+They are investigative leads, not proof of identity, causation or guilt.
+""",
+        encoding="utf-8",
+    )
+
+
 def build_benign() -> None:
     BENIGN.mkdir(parents=True, exist_ok=True)
     make_invoice(
@@ -363,9 +475,10 @@ def build_benign() -> None:
 def main() -> None:
     build_operation()
     build_benign()
+    build_digital_trail()
 
     manifest: dict[str, str] = {}
-    for path in sorted([*OPERATION.glob("*"), *BENIGN.glob("*")]):
+    for path in sorted([*OPERATION.glob("*"), *BENIGN.glob("*"), *DIGITAL.glob("*")]):
         if path.is_file() and path.name != "README.md":
             manifest[str(path.relative_to(ROOT))] = sha256(path)
     (ROOT / "manifest.json").write_text(

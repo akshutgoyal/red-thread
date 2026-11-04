@@ -32,8 +32,10 @@ from ..models import (
     Evidence,
     Finding,
     GraphEdge,
+    InvestigatorAnnotation,
     Relationship,
     Report,
+    ReviewDecision,
 )
 from ..models.base import new_id
 from ..utils.geo import parse_coordinates
@@ -179,8 +181,36 @@ def _load_report_data(db: Session, case: Case) -> dict[str, Any]:
                 ),
             }
         )
+    annotations = list(
+        db.scalars(
+            select(InvestigatorAnnotation)
+            .where(InvestigatorAnnotation.case_id == case.id)
+            .order_by(InvestigatorAnnotation.created_at.asc())
+        )
+    )
+    review_decisions = list(
+        db.scalars(
+            select(ReviewDecision)
+            .where(ReviewDecision.case_id == case.id)
+            .order_by(ReviewDecision.created_at.asc())
+        )
+    )
     relationship_types = dict(Counter(item.relationship_type for item in relationships))
     review_summary = dict(Counter(item.review_status for item in relationships))
+    undated_events = sum(1 for event in events if event.timestamp_normalized is None)
+    open_findings = sum(1 for finding in findings if finding.status == "open")
+    unresolved: list[str] = []
+    if open_findings:
+        unresolved.append(f"{open_findings} finding(s) remain open for investigator review.")
+    unreviewed = sum(1 for item in relationships if item.review_status == "unreviewed")
+    if unreviewed:
+        unresolved.append(f"{unreviewed} relationship(s) have not been reviewed.")
+    if undated_events:
+        unresolved.append(f"{undated_events} event(s) lack a normalized timestamp.")
+    if not relationships:
+        unresolved.append("No deterministic relationships have been generated yet.")
+    if not spatial_observations:
+        unresolved.append("No documented coordinates are available for spatial reconstruction.")
 
     return {
         "case": {
@@ -309,6 +339,30 @@ def _load_report_data(db: Session, case: Case) -> dict[str, Any]:
             for relationship in relationships
         ],
         "spatial_observations": spatial_observations,
+        "annotations": [
+            {
+                "id": item.id,
+                "target_type": item.target_type,
+                "target_id": item.target_id,
+                "author": item.author,
+                "note": item.note,
+                "created_at": item.created_at.isoformat(),
+            }
+            for item in annotations
+        ],
+        "review_decisions": [
+            {
+                "id": item.id,
+                "target_type": item.target_type,
+                "target_id": item.target_id,
+                "decision": item.decision,
+                "reviewer": item.reviewer,
+                "note": item.note,
+                "created_at": item.created_at.isoformat(),
+            }
+            for item in review_decisions
+        ],
+        "unresolved": unresolved,
         "audit": [
             {
                 "id": item.id,
@@ -677,6 +731,40 @@ def _build_pdf(path: Path, data: dict[str, Any]) -> None:
                 body_style,
             )
         )
+
+    story.append(_paragraph("5.3 Investigator annotations and review decisions", section_style))
+    if data["review_decisions"]:
+        review_rows: list[list[Any]] = [["Time (UTC)", "Target", "Decision", "Reviewer", "Note"]]
+        for item in data["review_decisions"][:120]:
+            review_rows.append(
+                [
+                    _paragraph(item["created_at"], small_style),
+                    _paragraph(f"{item['target_type']}: {item['target_id']}", mono_style),
+                    _paragraph(item["decision"], small_style),
+                    _paragraph(item["reviewer"] or "-", small_style),
+                    _paragraph(item["note"] or "-", small_style),
+                ]
+            )
+        story.append(_table(review_rows, [30 * mm, 52 * mm, 24 * mm, 30 * mm, 42 * mm], font_size=6.5))
+    else:
+        story.append(_paragraph("No relationship review decisions were recorded.", body_style))
+    if data["annotations"]:
+        annotation_rows: list[list[Any]] = [["Time (UTC)", "Target", "Author", "Note"]]
+        for item in data["annotations"][:120]:
+            annotation_rows.append(
+                [
+                    _paragraph(item["created_at"], small_style),
+                    _paragraph(f"{item['target_type']}: {item['target_id']}", mono_style),
+                    _paragraph(item["author"], small_style),
+                    _paragraph(item["note"], small_style),
+                ]
+            )
+        story.append(_table(annotation_rows, [30 * mm, 52 * mm, 30 * mm, 66 * mm], font_size=6.5))
+    else:
+        story.append(_paragraph("No investigator annotations were recorded.", body_style))
+    story.append(_paragraph("Unresolved questions", small_style))
+    for item in data["unresolved"]:
+        story.append(_paragraph(f"- {item}", body_style))
 
     story.append(_paragraph("6. AI-generated interpretations", section_style))
     story.append(
