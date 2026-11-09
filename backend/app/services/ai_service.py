@@ -45,8 +45,21 @@ Strict rules:
   "uncertainties": ["..."],
   "alternative_explanations": ["..."],
   "suggested_next_steps": ["..."],
-  "insufficient_evidence": false
+  "insufficient_evidence": false,
+  "classification": "observation|correlation|inference|hypothesis",
+  "observed": "what the records directly show, in simple English",
+  "supporting_evidence": [
+    {"kind": "evidence|event|finding|relationship", "id": "stored record ID", "reason": "why this supports the observation"}
+  ],
+  "why_it_matters": "possible relevance to the investigation",
+  "confidence_limitations": "how certain this is and what is missing",
+  "recommended_next_action": "one practical next investigation step"
 }
+7a. "classification" must state the weakest category that covers the whole answer:
+   observation = direct record, correlation = deterministic link between records,
+   inference = an interpretation drawn from records, hypothesis = unverified proposal.
+7b. "observed" must describe only what the records show. Put any interpretation in
+   "why_it_matters", and any proposal in "recommended_next_action".
 8. Mention an evidence, event, finding, or relationship ID in the answer only if that exact ID
    also appears in the citations array. Do not discuss unrelated or uncited IDs.
 9. Keep the answer clean and direct. Do not add a separate inventory of every record inspected.
@@ -753,6 +766,32 @@ def _coerce_list(value: Any, limit: int = 12) -> list[str]:
     return []
 
 
+def _coerce_supporting_evidence(value: Any, limit: int = 12) -> list[dict[str, Any]]:
+    """Normalize the model's supporting_evidence list.
+
+    Only structured entries with an id are kept. Free-text entries are dropped
+    rather than turned into pseudo-references.
+    """
+
+    if not isinstance(value, list):
+        return []
+    items: list[dict[str, Any]] = []
+    for entry in value[:limit]:
+        if not isinstance(entry, dict):
+            continue
+        identifier = str(entry.get("id") or "").strip()
+        if not identifier:
+            continue
+        items.append(
+            {
+                "kind": str(entry.get("kind") or "event").strip(),
+                "id": identifier,
+                "reason": str(entry.get("reason") or "").strip(),
+            }
+        )
+    return items
+
+
 def _check_locator(
     source_locator: str | None,
     allowed: set[str],
@@ -1038,6 +1077,12 @@ async def ask_ai(
         next_steps: list[str] = []
         insufficient = False
         validation_status = "unstructured"
+        classification = "inference"
+        observed = answer
+        why_it_matters = ""
+        confidence_limitations = ""
+        recommended_next_action = ""
+        supporting_evidence: list[dict[str, Any]] = []
     else:
         answer = str(parsed.get("answer") or "").strip()
         citations = _validate_citations(
@@ -1051,6 +1096,19 @@ async def ask_ai(
         alternatives = _coerce_list(parsed.get("alternative_explanations"))
         next_steps = _coerce_list(parsed.get("suggested_next_steps"))
         insufficient = bool(parsed.get("insufficient_evidence", False))
+        classification = str(parsed.get("classification") or "").strip().lower()
+        if classification not in {
+            "observation",
+            "correlation",
+            "inference",
+            "hypothesis",
+        }:
+            classification = "inference"
+        observed = str(parsed.get("observed") or "").strip()
+        why_it_matters = str(parsed.get("why_it_matters") or "").strip()
+        confidence_limitations = str(parsed.get("confidence_limitations") or "").strip()
+        recommended_next_action = str(parsed.get("recommended_next_action") or "").strip()
+        supporting_evidence = _coerce_supporting_evidence(parsed.get("supporting_evidence"))
         if citations and all(citation["verified"] for citation in citations):
             validation_status = "validated"
         elif citations:
@@ -1112,6 +1170,12 @@ async def ask_ai(
         "alternative_explanations": alternatives,
         "suggested_next_steps": next_steps,
         "insufficient_evidence": insufficient,
+        "classification": classification,
+        "observed": observed,
+        "supporting_evidence": supporting_evidence,
+        "why_it_matters": why_it_matters,
+        "confidence_limitations": confidence_limitations,
+        "recommended_next_action": recommended_next_action,
         "provider": response.provider,
         "model": response.model,
         "model_label": model_label(response.model),

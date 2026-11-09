@@ -1,6 +1,12 @@
 import type {
   AiAnswer,
   AiStatus,
+  AiSuggestionsResponse,
+  EventReviewListResponse,
+  EventReviewRecord,
+  GuidanceResponse,
+  NarrativeResponse,
+  ColumnMappingResponse,
   AuditEvent,
   CaseSummary,
   EntityDetail,
@@ -152,6 +158,20 @@ export const api = {
       `/evidence/${evidenceId}/text${query({ case_id: caseId })}`,
       { caseId },
     ),
+  getColumnMapping: (caseId: string, evidenceId: string) =>
+    request<ColumnMappingResponse>(
+      `/evidence/${evidenceId}/mapping${query({ case_id: caseId })}`,
+      { caseId },
+    ),
+  saveColumnMapping: (
+    caseId: string,
+    evidenceId: string,
+    mapping: Record<string, string | null>,
+  ) =>
+    request<ColumnMappingResponse>(
+      `/evidence/${evidenceId}/mapping${query({ case_id: caseId })}`,
+      { method: "PUT", caseId, body: { mapping } },
+    ),
   getEvidenceContentUrl: (caseId: string, evidenceId: string) =>
     `${API_BASE}/evidence/${evidenceId}/content${query({ case_id: caseId })}`,
 
@@ -168,8 +188,20 @@ export const api = {
       offset?: number;
     } = {},
   ) => request<EventListResponse>(`/cases/${caseId}/events${query(params)}`, { caseId }),
-  timeline: (caseId: string, limit = 1000) =>
-    request<TimelineResponse>(`/cases/${caseId}/timeline${query({ limit })}`, { caseId }),
+  timeline: (
+    caseId: string,
+    params: {
+      limit?: number;
+      start?: string;
+      end?: string;
+      evidence_id?: string;
+      event_type?: string;
+    } = {},
+  ) =>
+    request<TimelineResponse>(
+      `/cases/${caseId}/timeline${query({ limit: params.limit ?? 1000, ...params })}`,
+      { caseId },
+    ),
   graph: (caseId: string, includeTemporal = false, limit = 500) =>
     request<GraphResponse>(
       `/cases/${caseId}/graph${query({ include_temporal: includeTemporal, limit })}`,
@@ -265,6 +297,25 @@ export const api = {
       caseId,
       body: payload,
     }),
+
+  guidance: (caseId: string) =>
+    request<GuidanceResponse>(`/cases/${caseId}/guidance`, { caseId }),
+  narrative: (caseId: string) =>
+    request<NarrativeResponse>(`/cases/${caseId}/narrative`, { caseId }),
+  reviewEvent: (
+    caseId: string,
+    eventId: string,
+    payload: { decision: "relevant" | "not_relevant" | "needs_review"; reviewer?: string; note?: string },
+  ) =>
+    request<EventReviewRecord>(`/cases/${caseId}/events/${eventId}/review`, {
+      method: "POST",
+      caseId,
+      body: payload,
+    }),
+  listEventReviews: (caseId: string) =>
+    request<EventReviewListResponse>(`/cases/${caseId}/event-reviews`, { caseId }),
+  aiSuggestions: (caseId: string) =>
+    request<AiSuggestionsResponse>(`/cases/${caseId}/ai/suggestions`, { caseId }),
 
   listReports: (caseId: string) => request<ReportRecord[]>(`/cases/${caseId}/reports`, { caseId }),
   generateReport: (caseId: string, reportType: "pdf" | "json") =>

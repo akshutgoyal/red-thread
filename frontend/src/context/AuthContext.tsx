@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import type { AuthUser } from "@/types";
 
 interface AuthContextValue {
@@ -28,17 +28,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    api
-      .me()
-      .then((nextUser) => {
-        if (!cancelled) setUser(nextUser);
-      })
-      .catch(() => {
-        if (!cancelled) setUser(null);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
+    const loadUser = async (alreadyRetried = false) => {
+      try {
+        const nextUser = await api.me();
+        if (!cancelled) {
+          setUser(nextUser);
+          setIsLoading(false);
+        }
+      } catch (error) {
+        if (cancelled) return;
+        const transient = !(error instanceof ApiError) || error.status >= 500;
+        if (transient && !alreadyRetried) {
+          await new Promise((resolve) => setTimeout(resolve, 750));
+          if (!cancelled) return loadUser(true);
+        }
+        setUser(null);
+        setIsLoading(false);
+      }
+    };
+    void loadUser();
     return () => {
       cancelled = true;
     };

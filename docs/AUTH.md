@@ -83,9 +83,48 @@ HTTP 402 once recorded Isoquant usage reaches that estimated spend. This is an
 application-side budget guard; it is separate from the provider account
 balance, which should also be capped in the Isoquant console.
 
-## Per-visitor demo copies
+## Shared demo workspace
 
-Each new demo visitor gets a deep copy of the synthetic demo cases, including
-evidence objects, events, entities, findings, relationships, provenance,
-reviews and reports. Demo visitors cannot see or change another visitor's
-copies. The original seed cases act as templates.
+The demo is one shared synthetic workspace composed of ownerless demo cases.
+All demo visitors see and can edit the same demo data, as requested. Demo
+sessions are full-permission synthetic sessions.
+
+Old visitor-owned demo copies created by the previous experimental
+per-visitor implementation are hidden from the shared demo and removed after
+`DEMO_COPY_TTL_HOURS` (default 24) by startup cleanup, including their R2
+objects.
+
+## Session persistence
+
+Sessions use a persistent HttpOnly cookie with both `Max-Age` and `Expires`
+(seven days by default). The frontend calls `/auth/me` on load and retries
+transient failures once before showing the login screen, so a page refresh or
+new tab keeps a valid Google session.
+
+## Security hardening
+
+The following controls protect the session and the API surface. They are covered by
+`backend/tests/test_security_hardening.py` and `backend/tests/test_session_auth.py`.
+
+| Control | Behaviour |
+|---|---|
+| Session transport | The session JWT is set only in an `HttpOnly`, `Secure` (in production), `SameSite=None` cookie. The login response contains no token, so page scripts and XSS payloads cannot read it. |
+| CSRF | `SameSite=None` provides no CSRF protection, so state-changing requests are checked against the `CORS_ORIGINS` allow-list using the `Origin` header. Cross-site writes receive `403 Cross-site request blocked.` |
+| Rate-limit identity | `X-Forwarded-For` is attacker-controlled. Only the entries appended by our own proxies are trusted, controlled by `RED_THREAD_TRUSTED_PROXY_HOPS`. Limiter keys are hashed and the table is capped so an identity flood cannot exhaust memory. |
+| Security headers | API responses set `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Cross-Origin-Resource-Policy`, `Permissions-Policy`, a locked-down `Content-Security-Policy`, and HSTS over HTTPS. |
+| Uploaded content | Served with `nosniff`, a sandboxing CSP and `Content-Disposition`, so a stored file cannot execute in the app origin. |
+| CSV export | Cells beginning with `=`, `+`, `-`, `@`, tab, CR or NUL are prefixed with a single quote to neutralize spreadsheet formula injection. |
+| Startup guard | The backend refuses to start with `RED_THREAD_ENVIRONMENT=production` when `RED_THREAD_SESSION_SECRET` is the shipped placeholder or shorter than 32 characters. |
+| API docs | `/docs`, `/redoc` and `/openapi.json` are disabled in production unless `RED_THREAD_EXPOSE_API_DOCS=true`. |
+
+### Column mapping
+
+Generic CSV, JSON and JSONL files can be mapped explicitly when the parser's alias
+detection does not recognize the headers:
+
+- `GET /api/evidence/{id}/mapping` returns the headers, canonical fields, a suggested
+  mapping and up to five sample rows.
+- `PUT /api/evidence/{id}/mapping` stores the confirmed mapping in
+  `Evidence.metadata_json["column_mapping"]`. A timestamp column is required.
+- Parsing then reads the mapped columns. The stored bytes are never modified; reparse to
+  rebuild events.

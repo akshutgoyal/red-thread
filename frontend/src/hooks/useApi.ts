@@ -26,6 +26,10 @@ export const queryKeys = {
   annotations: (caseId: string) => ["annotations", caseId] as const,
   aiStatus: ["ai-status"] as const,
   reports: (caseId: string) => ["reports", caseId] as const,
+  guidance: (caseId: string) => ["guidance", caseId] as const,
+  narrative: (caseId: string) => ["narrative", caseId] as const,
+  eventReviews: (caseId: string) => ["event-reviews", caseId] as const,
+  aiSuggestions: (caseId: string) => ["ai-suggestions", caseId] as const,
 };
 
 export function useHealth() {
@@ -63,11 +67,48 @@ export function useEvents(
   });
 }
 
-export function useTimeline(caseId: string | undefined) {
+export function useTimeline(
+  caseId: string | undefined,
+  params: Parameters<typeof api.timeline>[1] = {},
+) {
   return useQuery({
-    queryKey: queryKeys.timeline(caseId ?? ""),
-    queryFn: () => api.timeline(caseId as string),
+    queryKey: [...queryKeys.timeline(caseId ?? ""), params],
+    queryFn: () => api.timeline(caseId as string, params),
     enabled: Boolean(caseId),
+  });
+}
+
+export function useGuidance(caseId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.guidance(caseId ?? ""),
+    queryFn: () => api.guidance(caseId as string),
+    enabled: Boolean(caseId),
+    retry: 1,
+  });
+}
+
+export function useNarrative(caseId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.narrative(caseId ?? ""),
+    queryFn: () => api.narrative(caseId as string),
+    enabled: Boolean(caseId),
+  });
+}
+
+export function useEventReviews(caseId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.eventReviews(caseId ?? ""),
+    queryFn: () => api.listEventReviews(caseId as string),
+    enabled: Boolean(caseId),
+  });
+}
+
+export function useAiSuggestions(caseId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.aiSuggestions(caseId ?? ""),
+    queryFn: () => api.aiSuggestions(caseId as string),
+    enabled: Boolean(caseId),
+    retry: false,
   });
 }
 
@@ -178,6 +219,11 @@ function useCaseInvalidation(caseId: string) {
     client.invalidateQueries({ queryKey: ["entity", caseId] });
     client.invalidateQueries({ queryKey: queryKeys.spatial(caseId) });
     client.invalidateQueries({ queryKey: queryKeys.reconstruction(caseId) });
+    client.invalidateQueries({ queryKey: queryKeys.guidance(caseId) });
+    client.invalidateQueries({ queryKey: queryKeys.narrative(caseId) });
+    client.invalidateQueries({ queryKey: queryKeys.eventReviews(caseId) });
+    client.invalidateQueries({ queryKey: queryKeys.aiSuggestions(caseId) });
+    client.invalidateQueries({ queryKey: queryKeys.reports(caseId) });
   };
 }
 
@@ -262,6 +308,34 @@ export function useReviewRelationship(caseId: string) {
       relationshipId: string;
       payload: { decision: string; reviewer?: string; note?: string };
     }) => api.reviewRelationship(caseId, relationshipId, payload),
+    onSuccess: invalidate,
+  });
+}
+
+export function useSaveColumnMapping(caseId: string) {
+  const invalidate = useCaseInvalidation(caseId);
+  return useMutation({
+    mutationFn: ({
+      evidenceId,
+      mapping,
+    }: {
+      evidenceId: string;
+      mapping: Record<string, string | null>;
+    }) => api.saveColumnMapping(caseId, evidenceId, mapping),
+    onSuccess: invalidate,
+  });
+}
+
+export function useReviewEvent(caseId: string) {
+  const invalidate = useCaseInvalidation(caseId);
+  return useMutation({
+    mutationFn: ({
+      eventId,
+      payload,
+    }: {
+      eventId: string;
+      payload: { decision: "relevant" | "not_relevant" | "needs_review"; reviewer?: string; note?: string };
+    }) => api.reviewEvent(caseId, eventId, payload),
     onSuccess: invalidate,
   });
 }

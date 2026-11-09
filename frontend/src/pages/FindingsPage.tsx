@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   CheckCircle2,
   ChevronRight,
@@ -23,6 +23,8 @@ import type { Finding, FindingStatus } from "@/types";
 
 export function FindingsPage() {
   const { caseId } = useParams<{ caseId: string }>();
+  const [searchParams] = useSearchParams();
+  const deepFindingId = searchParams.get("finding");
   const toast = useToast();
   const findingsQuery = useFindings(caseId);
   const reconcile = useReconcile(caseId ?? "");
@@ -36,6 +38,20 @@ export function FindingsPage() {
   const [reviewNote, setReviewNote] = useState("");
 
   const findings = useMemo(() => findingsQuery.data?.items ?? [], [findingsQuery.data]);
+
+  useEffect(() => {
+    if (!deepFindingId) return;
+    const match = findings.find((item) => item.id === deepFindingId);
+    if (match) {
+      setSelected(match);
+      setReviewStatus(
+        match.status === "open" || match.status === "needs_review"
+          ? "needs_review"
+          : (match.status as FindingStatus),
+      );
+      setReviewNote(match.reviewer_note ?? "");
+    }
+  }, [deepFindingId, findings]);
   const categories = useMemo(
     () => Array.from(new Set(findings.map((item) => item.category))).sort(),
     [findings],
@@ -215,6 +231,7 @@ export function FindingsPage() {
                     <p className="mt-1 text-[10px] uppercase tracking-wider text-muted">
                       {humanize(finding.category)} · {humanize(finding.detection_method)} ·{" "}
                       {humanize(finding.confidence)} confidence
+                      {finding.classification ? ` · ${finding.classification}` : ""}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -301,6 +318,56 @@ export function FindingsPage() {
                 </p>
               </div>
             </div>
+
+            {(selected.related_entities?.length ?? 0) > 0 ? (
+              <div>
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  Entities involved
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(selected.related_entities ?? []).map((entity, index) => (
+                    <Link
+                      key={`${entity.entity_id}-${entity.event_id ?? index}`}
+                      to={`/cases/${caseId}/entities?entityId=${entity.entity_id}`}
+                      className="rounded-md border border-line bg-surface-2/60 px-2 py-1 text-[11px] text-secondary transition hover:border-accent/40 hover:text-accent"
+                    >
+                      <span className="text-[9px] uppercase tracking-wider text-muted">
+                        {entity.entity_type}
+                      </span>{" "}
+                      {entity.value}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {(selected.timeline_refs?.length ?? 0) > 0 ? (
+              <div>
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  Where this appears in the timeline
+                </p>
+                <ul className="space-y-1">
+                  {(selected.timeline_refs ?? []).map((ref) => (
+                    <li key={ref.event_id}>
+                      <Link
+                        to={`/cases/${caseId}/timeline?event=${ref.event_id}`}
+                        className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface-2/40 px-2.5 py-1.5 text-[11px] text-secondary transition hover:border-accent/40"
+                      >
+                        <span className="text-muted">
+                          {ref.timestamp_normalized
+                            ? new Date(ref.timestamp_normalized).toLocaleString()
+                            : "Undated"}
+                        </span>
+                        <span className="capitalize">{humanize(ref.event_type)}</span>
+                        <span className="ml-auto font-mono text-[10px] text-accent">
+                          open
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
             <div>
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted">

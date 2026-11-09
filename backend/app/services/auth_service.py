@@ -51,6 +51,7 @@ def set_session_cookie(
         key=SESSION_COOKIE,
         value=token,
         max_age=settings.session_ttl_hours * 3600,
+        expires=datetime.now(timezone.utc) + timedelta(hours=settings.session_ttl_hours),
         httponly=True,
         secure=secure,
         samesite="none" if secure else "lax",
@@ -155,7 +156,8 @@ def authorize_request(
     if case is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found.")
     if principal.is_demo:
-        allowed = case.is_demo and case.owner_id == principal.user_id
+        # The demo is one shared workspace made of ownerless demo cases.
+        allowed = case.is_demo and case.owner_id is None
     else:
         allowed = case.owner_id == principal.user_id
     if not allowed:

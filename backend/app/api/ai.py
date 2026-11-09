@@ -6,8 +6,13 @@ from sqlalchemy.orm import Session
 from ..config import Settings, get_settings
 from ..database import get_db
 from ..dependencies import get_case_or_404
-from ..schemas.ai import AiAnswerResponse, AiAskRequest, AiStatusResponse
-from ..services import ai_service
+from ..schemas.ai import (
+    AiAnswerResponse,
+    AiAskRequest,
+    AiStatusResponse,
+    AiSuggestionsResponse,
+)
+from ..services import ai_service, suggestion_service
 
 router = APIRouter(tags=["ai"])
 
@@ -18,6 +23,19 @@ async def ai_status(
     settings: Settings = Depends(get_settings),
 ) -> AiStatusResponse:
     return AiStatusResponse(**await ai_service.get_status(settings, check=check))
+
+
+@router.get(
+    "/cases/{case_id}/ai/suggestions",
+    response_model=AiSuggestionsResponse,
+)
+def ai_suggestions(
+    case_id: str,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> AiSuggestionsResponse:
+    get_case_or_404(db, case_id)
+    return suggestion_service.build_suggestions(db, case_id, settings)
 
 
 @router.post("/cases/{case_id}/ai/ask", response_model=AiAnswerResponse)

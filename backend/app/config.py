@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     r2_region: str = Field(default="auto", validation_alias="R2_REGION")
 
     auth_required: bool = True
+    demo_copy_ttl_hours: int = 24
     rate_limit_enabled: bool = True
     rate_limit_api_per_minute: int = 120
     rate_limit_auth_per_minute: int = 10
@@ -51,6 +52,10 @@ class Settings(BaseSettings):
     rate_limit_uploads_per_minute: int = 30
     session_secret: str = "red-thread-dev-session-secret-change-me"
     session_ttl_hours: int = 168
+    # Number of reverse proxies in front of the app whose X-Forwarded-For
+    # entries can be trusted. 1 = a single managed edge (Render/Vercel).
+    trusted_proxy_hops: int = 1
+    expose_api_docs: bool | None = None
     google_client_id: str | None = Field(default=None, validation_alias="GOOGLE_CLIENT_ID")
 
     auth_default_timezone: str = "UTC"
@@ -210,6 +215,21 @@ class Settings(BaseSettings):
         if self.r2_account_id:
             return f"https://{self.r2_account_id}.r2.cloudflarestorage.com"
         return None
+
+    @property
+    def docs_enabled(self) -> bool:
+        """Interactive API docs are development-only unless explicitly enabled."""
+        if self.expose_api_docs is not None:
+            return self.expose_api_docs
+        return self.environment.strip().lower() != "production"
+
+    @property
+    def session_secret_is_insecure(self) -> bool:
+        secret = (self.session_secret or "").strip()
+        return (
+            secret == "red-thread-dev-session-secret-change-me"
+            or len(secret) < 32
+        )
 
     @property
     def cors_origin_list(self) -> list[str]:

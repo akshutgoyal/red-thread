@@ -1,28 +1,20 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from sqlalchemy.orm import Session
 
-import secrets
-
-import secrets
-
-from sqlalchemy import select
-
-from ..database import get_db
-from ..models import Case
 from ..schemas.auth_session import AuthResponse, AuthUserRead, GoogleLoginRequest
 from ..services.auth_service import (
     clear_session_cookie,
     create_session_token,
     demo_principal,
-    get_optional_principal,
     get_principal,
     principal_for_user,
     set_session_cookie,
     upsert_google_user,
     verify_google_credential,
 )
+from ..database import get_db
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -49,30 +41,16 @@ def google_login(
     principal = principal_for_user(user)
     token = create_session_token(principal)
     set_session_cookie(response, token, request)
-    return AuthResponse(token=token, user=_user_read(principal))
+    return AuthResponse(user=_user_read(principal))
 
 
 @router.post("/demo", response_model=AuthResponse)
-def demo_login(
-    request: Request,
-    response: Response,
-    db: Session = Depends(get_db),
-) -> AuthResponse:
-    existing = get_optional_principal(request)
-    if existing and existing.is_demo:
-        has_cases = db.scalar(select(Case.id).where(Case.owner_id == existing.user_id).limit(1))
-        if has_cases:
-            token = create_session_token(existing)
-            set_session_cookie(response, token, request)
-            return AuthResponse(token=token, user=_user_read(existing))
-
-    principal = demo_principal(f"demo-{secrets.token_hex(12)}")
-    from ..services.demo_copy_service import clone_demo_templates
-
-    clone_demo_templates(db, principal.user_id)
+def demo_login(request: Request, response: Response) -> AuthResponse:
+    """Use the one shared synthetic demo workspace."""
+    principal = demo_principal("demo-user")
     token = create_session_token(principal)
     set_session_cookie(response, token, request)
-    return AuthResponse(token=token, user=_user_read(principal))
+    return AuthResponse(user=_user_read(principal))
 
 
 @router.post("/logout")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -39,8 +40,24 @@ class AiAnswerResponse(BaseModel):
     alternative_explanations: list[str]
     suggested_next_steps: list[str]
     insufficient_evidence: bool
+    classification: str = "inference"
+    observed: str = ""
+    supporting_evidence: list[dict[str, Any]] = Field(default_factory=list)
+    why_it_matters: str = ""
+    confidence_limitations: str = ""
+    recommended_next_action: str = ""
     provider: str
     model: str
     model_label: str
     ai_generated: bool = True
     usage: dict[str, Any] = Field(default_factory=dict)
+
+
+class AiSuggestionRead(BaseModel):
+    question: str
+    reason: str
+
+
+class AiSuggestionsResponse(BaseModel):
+    items: list[AiSuggestionRead]
+    generated_at: datetime

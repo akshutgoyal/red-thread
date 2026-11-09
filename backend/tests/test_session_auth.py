@@ -21,14 +21,14 @@ def test_session_token_round_trip():
 
 
 def test_demo_login_and_me(client):
+    client.cookies.clear()
     response = client.post("/api/auth/demo")
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["user"]["is_demo"] is True
-    me = client.get(
-        "/api/auth/me",
-        headers={"Authorization": f"Bearer {payload['token']}"},
-    )
+    # The session must live in the HttpOnly cookie only.
+    assert payload.get("token") is None
+    me = client.get("/api/auth/me")
     assert me.status_code == 200, me.text
     assert me.json()["is_demo"] is True
 
@@ -63,8 +63,7 @@ def test_personal_cases_are_scoped_and_cross_account_access_is_denied(client):
 def test_demo_scope_only_returns_demo_cases(client):
     demo = client.post("/api/auth/demo")
     assert demo.status_code == 200
-    headers = {"Authorization": f"Bearer {demo.json()['token']}"}
-    response = client.get("/api/cases", headers=headers)
+    response = client.get("/api/cases")
     assert response.status_code == 200
     assert all(item["is_demo"] for item in response.json())
 
@@ -88,10 +87,8 @@ def test_google_login_creates_a_new_empty_workspace(client, monkeypatch):
     payload = response.json()
     assert payload["user"]["email"] == "new-google@example.com"
     assert payload["user"]["is_demo"] is False
-    cases = client.get(
-        "/api/cases",
-        headers={"Authorization": f"Bearer {payload['token']}"},
-    )
+    assert payload.get("token") is None
+    cases = client.get("/api/cases")
     assert cases.status_code == 200
     assert cases.json() == []
 
@@ -104,6 +101,8 @@ def test_demo_session_uses_httponly_cookie(client):
     assert "red_thread_session=" in cookie
     assert "httponly" in cookie
     assert "samesite" in cookie
+    assert "expires=" in cookie
+    assert "max-age=" in cookie
 
     me = client.get("/api/auth/me")
     assert me.status_code == 200, me.text
@@ -114,33 +113,36 @@ def test_demo_session_uses_httponly_cookie(client):
     assert client.get("/api/auth/me").status_code == 401
 
 
-def test_demo_cases_are_copied_per_visitor(client, db):
+def test_demo_is_one_shared_workspace(client, db):
     from app.schemas.case import CaseCreate
     from app.services import case_service
 
     template = case_service.create_case(
         db,
-        CaseCreate(title="Per Visitor Demo Template", description="Synthetic template."),
+        CaseCreate(title="Shared Demo Template", description="Synthetic template."),
         is_demo=True,
     )
-    assert template.owner_id is None
-
     client.cookies.clear()
     first = client.post("/api/auth/demo")
     assert first.status_code == 200, first.text
-    first_token = first.json()["token"]
-    first_headers = {"Authorization": f"Bearer {first_token}"}
-    first_cases = client.get("/api/cases", headers=first_headers).json()
-    first_copy = next(item for item in first_cases if item["title"] == template.title)
-    assert first_copy["id"] != template.id
-    assert first_copy["is_demo"] is True
-
-    client.cookies.clear()
     second = client.post("/api/auth/demo")
     assert second.status_code == 200, second.text
-    assert second.json()["user"]["id"] != first.json()["user"]["id"]
-    second_headers = {"Authorization": f"Bearer {second.json()['token']}"}
-    second_cases = client.get("/api/cases", headers=second_headers).json()
-    second_ids = {item["id"] for item in second_cases}
-    assert first_copy["id"] not in second_ids
-    assert any(item["title"] == template.title for item in second_cases)
+    assert first.json()["user"]["id"] == "demo-user"
+    assert second.json()["user"]["id"] == "demo-user"
+
+    cases = client.get("/api/cases")
+    assert cases.status_code == 200
+    shared = [item for item in cases.json() if item["title"] == template.title]
+    assert len(shared) == 1
+    assert shared[0]["id"] == template.id
+    assert all(item["is_demo"] for item in cases.json())
+
+
+def test_login_never_returns_the_session_token(client):
+    client.cookies.clear()
+    demo = client.post("/api/auth/demo")
+    assert demo.status_code == 200
+    assert "token" not in demo.json() or demo.json()["token"] is None
+    cookie = demo.headers.get("set-cookie", "")
+    # The value must only ever travel in the HttpOnly cookie.
+    assert "red_thread_session=" in cookie

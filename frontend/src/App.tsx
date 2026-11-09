@@ -18,6 +18,7 @@ import { EvidenceVaultPage } from "@/pages/EvidenceVaultPage";
 import { EvidenceIntakePage } from "@/pages/EvidenceIntakePage";
 import { AuthAnalysisPage } from "@/pages/AuthAnalysisPage";
 import { TimelinePage } from "@/pages/TimelinePage";
+import { EventsPage } from "@/pages/EventsPage";
 import { GraphPage } from "@/pages/GraphPage";
 import { FindingsPage } from "@/pages/FindingsPage";
 import { AiAssistantPage } from "@/pages/AiAssistantPage";
@@ -71,6 +72,7 @@ export function App() {
               <Route path="evidence/intake" element={<EvidenceIntakePage />} />
               <Route path="entities" element={<EntityExplorerPage />} />
               <Route path="auth" element={<AuthAnalysisPage />} />
+              <Route path="events" element={<EventsPage />} />
               <Route path="timeline" element={<TimelinePage />} />
               <Route path="graph" element={<GraphPage />} />
               <Route path="spatial" element={<SpatialPage />} />

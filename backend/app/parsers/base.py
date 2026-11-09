@@ -15,6 +15,8 @@ class ParserContext:
     reference_date: datetime | None = None
     default_year: int | None = None
     timezone: str = "UTC"
+    # Investigator-confirmed column mapping for generic delimited files.
+    column_mapping: dict[str, str] | None = None
 
 
 @dataclass

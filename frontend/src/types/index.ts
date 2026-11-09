@@ -48,6 +48,15 @@ export interface HashVerifyResponse {
   message: string;
 }
 
+export interface WarningDetail {
+  message: string;
+  category: string;
+  impact: string;
+  recommendation: string;
+  can_use: boolean;
+  source_locator: string;
+}
+
 export interface ParseResponse {
   evidence_id: string;
   parser_name: string;
@@ -55,6 +64,9 @@ export interface ParseResponse {
   events_created: number;
   findings_created: number;
   warnings: string[];
+  warning_details?: WarningDetail[];
+  records_extracted?: number | null;
+  records_rejected?: number | null;
   summary: Record<string, unknown>;
   status: string;
 }
@@ -85,10 +97,31 @@ export interface EventListResponse {
   offset: number;
 }
 
+export interface TimelineEventMeta {
+  finding_ids: string[];
+  relationship_ids: string[];
+  review_status: string | null;
+  suspicious: boolean;
+}
+
+export interface TimelineGroup {
+  id: string;
+  title: string;
+  explanation: string;
+  event_ids: string[];
+  relationship_id: string | null;
+  classification: string | null;
+  confidence: string | null;
+  start: string | null;
+  end: string | null;
+}
+
 export interface TimelineResponse {
   items: EventRecord[];
   undated: EventRecord[];
   total: number;
+  event_meta: Record<string, TimelineEventMeta>;
+  groups: TimelineGroup[];
 }
 
 export interface EntityRecord {
@@ -159,6 +192,22 @@ export interface Finding {
   created_at: string;
   updated_at: string;
   evidence_links: FindingEvidence[];
+  related_entities?: FindingEntityRef[];
+  timeline_refs?: FindingTimelineRef[];
+  classification?: string;
+}
+
+export interface FindingEntityRef {
+  entity_id: string;
+  entity_type: string;
+  value: string;
+  event_id: string | null;
+}
+
+export interface FindingTimelineRef {
+  event_id: string;
+  timestamp_normalized: string | null;
+  event_type: string;
 }
 
 export interface FindingListResponse {
@@ -213,6 +262,12 @@ export interface AiAnswer {
   alternative_explanations: string[];
   suggested_next_steps: string[];
   insufficient_evidence: boolean;
+  classification?: string;
+  observed?: string;
+  supporting_evidence?: { kind: string; id: string; reason: string }[];
+  why_it_matters?: string;
+  confidence_limitations?: string;
+  recommended_next_action?: string;
   provider: string;
   model: string;
   model_label: string;
@@ -346,6 +401,120 @@ export interface AuthUser {
 }
 
 export interface AuthSession {
-  token: string;
+  // The session itself lives in an HttpOnly cookie; the API never returns it.
+  token?: string | null;
   user: AuthUser;
+}
+
+export type GuidanceStageStatus = "complete" | "in_progress" | "not_started";
+
+export interface GuidanceStage {
+  key: string;
+  index: number;
+  title: string;
+  description: string;
+  what_to_do: string;
+  output: string;
+  status: GuidanceStageStatus;
+  href: string;
+  completed_count: number;
+  total_count: number;
+  next_step?: string;
+  detail?: string;
+}
+
+export interface GuidanceAction {
+  id: string;
+  title: string;
+  reason: string;
+  action_label: string;
+  href: string;
+  tone: "info" | "warning" | "critical";
+}
+
+export interface GuidanceAttention {
+  kind: string;
+  title: string;
+  detail: string;
+  href: string;
+  count: number;
+}
+
+export interface GuidanceSummary {
+  evidence: number;
+  parsed: number;
+  needs_attention: number;
+  events: number;
+  entities: number;
+  open_findings: number;
+  unreviewed_relationships: number;
+  reports: number;
+}
+
+export interface GuidanceResponse {
+  case_id: string;
+  generated_at: string;
+  stages: GuidanceStage[];
+  next_action: GuidanceAction;
+  attention: GuidanceAttention[];
+  summary: GuidanceSummary;
+  scanned_events: number;
+}
+
+export interface NarrativeItem {
+  index: number;
+  statement: string;
+  kind: "observation" | "correlation" | "finding" | "review" | "report";
+  timestamp: string | null;
+  event_ids: string[];
+  evidence_ids: string[];
+  finding_ids: string[];
+  relationship_ids: string[];
+  href: string;
+}
+
+export interface NarrativeResponse {
+  case_id: string;
+  generated_at: string;
+  items: NarrativeItem[];
+  disclaimer: string;
+}
+
+export interface EventReviewRecord {
+  event_id: string;
+  decision: string;
+  reviewer: string;
+  note: string;
+  reviewed_at: string;
+}
+
+export interface EventReviewListResponse {
+  items: EventReviewRecord[];
+  total: number;
+}
+
+export interface AiSuggestion {
+  question: string;
+  reason: string;
+}
+
+export interface AiSuggestionsResponse {
+  items: AiSuggestion[];
+  generated_at: string;
+}
+
+export interface ColumnMappingField {
+  key: string;
+  label: string;
+  required: boolean;
+}
+
+export interface ColumnMappingResponse {
+  supported: boolean;
+  reason: string;
+  headers: string[];
+  fields: ColumnMappingField[];
+  suggested: Record<string, string | null>;
+  saved_mapping: Record<string, string>;
+  rows: Record<string, string>[];
 }

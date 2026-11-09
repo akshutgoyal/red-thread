@@ -1,34 +1,50 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import cytoscape, { type Core, type ElementDefinition } from "cytoscape";
-import { GitBranch, Info, RefreshCcw, Search } from "lucide-react";
-import { useGraph } from "@/hooks/useApi";
+import {
+  ArrowRight,
+  GitBranch,
+  Info,
+  RotateCcw,
+  Search,
+  Waypoints,
+} from "lucide-react";
+import { useEntityDetail, useEvidence, useGraph } from "@/hooks/useApi";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
 import { Input, Select } from "@/components/ui/Field";
+import { SegmentedControl } from "@/components/ui/Primitives";
 import { RelationshipEvidencePanel } from "@/components/relationship/RelationshipEvidencePanel";
 import { cn } from "@/lib/cn";
+import { formatDateTime, humanize } from "@/lib/format";
 import { useTheme } from "@/theme/ThemeContext";
+import type { GraphEdge, GraphNode } from "@/types";
 
 const NODE_COLORS_LIGHT: Record<string, string> = {
   evidence: "#0891b2",
   event: "#4f46e5",
   phone: "#059669",
-  upi_vpa: "#db2777",
+  person: "#0f766e",
+  device: "#0369a1",
   ip: "#dc2626",
   username: "#7c3aed",
-  utr: "#d97706",
-  filename: "#64748b",
+  account: "#7c3aed",
+  session: "#7c3aed",
+  transaction: "#ea580c",
   transaction_id: "#ea580c",
-  invoice_id: "#2563eb",
-  host: "#475569",
+  upi_vpa: "#db2777",
   email: "#0d9488",
+  filename: "#64748b",
+  file: "#64748b",
+  host: "#475569",
   url: "#0284c7",
   amount: "#ca8a04",
   cell_tower: "#9333ea",
+  utr: "#d97706",
+  invoice_id: "#2563eb",
   default: "#d97706",
 };
 
@@ -36,19 +52,68 @@ const NODE_COLORS_DARK: Record<string, string> = {
   evidence: "#22d3ee",
   event: "#818cf8",
   phone: "#34d399",
-  upi_vpa: "#f472b6",
+  person: "#2dd4bf",
+  device: "#38bdf8",
   ip: "#f87171",
   username: "#a78bfa",
-  utr: "#fbbf24",
-  filename: "#94a3b8",
+  account: "#a78bfa",
+  session: "#c4b5fd",
+  transaction: "#fb923c",
   transaction_id: "#fb923c",
-  invoice_id: "#60a5fa",
+  upi_vpa: "#f472b6",
+  email: "#5eead4",
+  filename: "#94a3b8",
+  file: "#94a3b8",
   host: "#64748b",
-  email: "#2dd4bf",
-  url: "#38bdf8",
+  url: "#7dd3fc",
   amount: "#facc15",
   cell_tower: "#c084fc",
+  utr: "#fbbf24",
+  invoice_id: "#60a5fa",
   default: "#f59e0b",
+};
+
+const NODE_LABELS: Record<string, string> = {
+  evidence: "Evidence file",
+  event: "Extracted event",
+  phone: "Phone number",
+  person: "Person / contact",
+  device: "Device",
+  ip: "IP address",
+  username: "User account",
+  session: "Session",
+  transaction: "Transaction",
+  transaction_id: "Transaction ID",
+  upi_vpa: "UPI VPA",
+  email: "Email address",
+  filename: "File name",
+  file: "File",
+  host: "Host",
+  url: "URL",
+  amount: "Amount",
+  cell_tower: "Cell tower",
+  utr: "UTR",
+  invoice_id: "Invoice ID",
+};
+
+/** Cytoscape shape per entity category, so types are distinguishable without colour alone. */
+const NODE_SHAPES: Record<string, string> = {
+  evidence: "round-rectangle",
+  event: "ellipse",
+  phone: "circle",
+  person: "ellipse",
+  device: "round-rectangle",
+  ip: "hexagon",
+  username: "triangle",
+  session: "pentagon",
+  transaction: "octagon",
+  transaction_id: "octagon",
+  upi_vpa: "diamond",
+  email: "ellipse",
+  filename: "tag",
+  file: "tag",
+  cell_tower: "triangle",
+  amount: "round-rectangle",
 };
 
 const GRAPH_PALETTES = {
@@ -56,6 +121,7 @@ const GRAPH_PALETTES = {
     label: "#334155",
     border: "#ffffff",
     edge: "#94a3b8",
+    edgeLabel: "#475569",
     exact: "#059669",
     conflict: "#e11d48",
     heuristic: "#d97706",
@@ -64,6 +130,7 @@ const GRAPH_PALETTES = {
     label: "#cbd5e1",
     border: "#0f172a",
     edge: "#475569",
+    edgeLabel: "#94a3b8",
     exact: "#34d399",
     conflict: "#fb7185",
     heuristic: "#fbbf24",
@@ -75,6 +142,22 @@ interface SelectedElement {
   data: Record<string, unknown>;
 }
 
+type GraphMode = "simple" | "advanced";
+
+function nodeCategory(node: GraphNode): string {
+  if (node.node_type === "entity") {
+    return String(node.data.entity_type ?? "entity");
+  }
+  return node.node_type;
+}
+
+function edgeIsContainment(edge: GraphEdge): boolean {
+  return (
+    edge.edge_type === "evidence_contains_event" ||
+    edge.edge_type.startsWith("event_mentions_")
+  );
+}
+
 export function GraphPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const { theme } = useTheme();
@@ -83,16 +166,22 @@ export function GraphPage() {
   const [searchParams] = useSearchParams();
   const focusType = searchParams.get("focusType");
   const focusId = searchParams.get("focusId");
+
+  const [mode, setMode] = useState<GraphMode>("simple");
   const [includeTemporal, setIncludeTemporal] = useState(false);
   const [layout, setLayout] = useState("cose");
   const [showEvidence, setShowEvidence] = useState(true);
   const [showEvents, setShowEvents] = useState(true);
   const [showEntities, setShowEntities] = useState(true);
+  const [evidenceFilter, setEvidenceFilter] = useState("all");
+  const [reviewFilter, setReviewFilter] = useState("all");
+  const [showConnections, setShowConnections] = useState(true);
   const [selected, setSelected] = useState<SelectedElement | null>(null);
+  const [hover, setHover] = useState<string | null>(null);
   const [search, setSearch] = useState(focusId ?? "");
-  const [classificationFilter, setClassificationFilter] = useState("all");
   const [neighbourFocus, setNeighbourFocus] = useState(false);
   const graphQuery = useGraph(caseId, includeTemporal);
+  const evidenceQuery = useEvidence(caseId);
 
   useEffect(() => {
     if (focusId) setSearch(focusId);
@@ -100,18 +189,42 @@ export function GraphPage() {
 
   const nodes = useMemo(() => graphQuery.data?.nodes ?? [], [graphQuery.data]);
   const edges = useMemo(() => graphQuery.data?.edges ?? [], [graphQuery.data]);
+  const evidenceNames = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const item of evidenceQuery.data ?? []) map.set(item.id, item.original_filename);
+    return map;
+  }, [evidenceQuery.data]);
+
+  const relationshipEdges = useMemo(
+    () => edges.filter((edge) => !edgeIsContainment(edge)),
+    [edges],
+  );
+
+  const importantEntityIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const edge of relationshipEdges) {
+      if (edge.source.startsWith("entity:")) ids.add(edge.source);
+      if (edge.target.startsWith("entity:")) ids.add(edge.target);
+    }
+    return ids;
+  }, [relationshipEdges]);
 
   const visibleElements = useMemo<ElementDefinition[]>(() => {
     const searchTerm = search.trim().toLowerCase();
+    const simple = mode === "simple";
+
     let allowedNodeIds = new Set(
       nodes
-        .filter((node) =>
-          node.node_type === "evidence"
-            ? showEvidence
-            : node.node_type === "event"
-              ? showEvents
-              : showEntities,
-        )
+        .filter((node) => {
+          const category = nodeCategory(node);
+          if (category === "evidence") return !simple && showEvidence;
+          if (category === "event") return !simple && showEvents;
+          if (!showEntities) return false;
+          if (simple && importantEntityIds.size > 0) {
+            return importantEntityIds.has(node.id);
+          }
+          return true;
+        })
         .map((node) => node.id),
     );
 
@@ -125,9 +238,12 @@ export function GraphPage() {
           )
           .map((node) => node.id),
       );
-      allowedNodeIds = new Set(
-        [...allowedNodeIds].filter((id) => matching.has(id)),
-      );
+      const withContext = new Set(matching);
+      for (const edge of edges) {
+        if (matching.has(edge.source)) withContext.add(edge.target);
+        if (matching.has(edge.target)) withContext.add(edge.source);
+      }
+      allowedNodeIds = new Set([...allowedNodeIds].filter((id) => withContext.has(id)));
     }
 
     if (neighbourFocus && selected?.kind === "node") {
@@ -137,32 +253,41 @@ export function GraphPage() {
         if (edge.source === selectedId) neighbours.add(edge.target);
         if (edge.target === selectedId) neighbours.add(edge.source);
       }
-      allowedNodeIds = new Set(
-        [...allowedNodeIds].filter((id) => neighbours.has(id)),
-      );
+      allowedNodeIds = new Set([...allowedNodeIds].filter((id) => neighbours.has(id)));
     }
 
     const nodeElements = nodes
       .filter((node) => allowedNodeIds.has(node.id))
-      .map((node) => ({
-        data: {
-          ...node.data,
-          id: node.id,
-          label: node.label,
-          node_type: node.node_type,
-          color:
-            nodeColors[
-              String(node.data.entity_type ?? node.node_type ?? "default")
-            ] ?? nodeColors.default,
-        },
-      }));
+      .map((node) => {
+        const category = nodeCategory(node);
+        return {
+          data: {
+            ...node.data,
+            id: node.id,
+            label: node.label,
+            node_type: node.node_type,
+            category,
+            shape: NODE_SHAPES[category] ?? "ellipse",
+            color: nodeColors[category] ?? nodeColors.default,
+            type_label: NODE_LABELS[category] ?? humanize(category),
+          },
+        };
+      });
+
     const edgeElements = edges
       .filter((edge) => allowedNodeIds.has(edge.source) && allowedNodeIds.has(edge.target))
-      .filter(
-        (edge) =>
-          classificationFilter === "all" ||
-          edge.classification === classificationFilter,
-      )
+      .filter((edge) => (simple ? !edgeIsContainment(edge) : showConnections || edgeIsContainment(edge)))
+      .filter((edge) => {
+        if (evidenceFilter === "all") return true;
+        return edge.supporting_evidence_ids.includes(evidenceFilter);
+      })
+      .filter((edge) => {
+        if (reviewFilter === "all") return true;
+        if (reviewFilter === "unreviewed") {
+          return !edge.review_status || edge.review_status === "unreviewed";
+        }
+        return edge.review_status === reviewFilter;
+      })
       .map((edge) => ({
         data: {
           ...(edge.data ?? {}),
@@ -179,36 +304,77 @@ export function GraphPage() {
           correlation_rule: edge.correlation_rule ?? undefined,
           classification: edge.classification ?? undefined,
           review_status: edge.review_status ?? undefined,
+          has_relationship: Boolean(edge.relationship_id),
           line_style: edge.match_method === "heuristic" ? "dashed" : "solid",
         },
       }));
+
     return [...nodeElements, ...edgeElements];
   }, [
     nodes,
     edges,
+    mode,
     showEvidence,
     showEvents,
     showEntities,
+    showConnections,
+    evidenceFilter,
+    reviewFilter,
+    importantEntityIds,
     nodeColors,
     search,
-    classificationFilter,
     neighbourFocus,
     selected,
   ]);
+
+  const visibleCounts = useMemo(() => {
+    let nodeCount = 0;
+    let edgeCount = 0;
+    for (const element of visibleElements) {
+      if ("source" in element.data) edgeCount += 1;
+      else nodeCount += 1;
+    }
+    return { nodeCount, edgeCount };
+  }, [visibleElements]);
+
+  const resetView = () => {
+    setSearch("");
+    setEvidenceFilter("all");
+    setReviewFilter("all");
+    setShowEvidence(true);
+    setShowEvents(true);
+    setShowEntities(true);
+    setShowConnections(true);
+    setNeighbourFocus(false);
+    setSelected(null);
+    setMode("simple");
+    setIncludeTemporal(false);
+  };
 
   if (!caseId) return <ErrorState title="Missing case ID" />;
   if (graphQuery.isLoading) return <LoadingState label="Building relationship graph…" />;
   if (graphQuery.error)
     return <ErrorState message={graphQuery.error.message} onRetry={() => graphQuery.refetch()} />;
 
+  const simple = mode === "simple";
+
   return (
     <div>
       <PageHeader
         eyebrow="Relationship graph"
-        title="Evidence, events and entities"
-        description="Exact identifier matches are labelled separately from heuristic leads. A temporal proximity edge is a lead, not proof of a relationship."
+        title="How the evidence connects"
+        description="Each line explains a documented connection. Colours and shapes identify the type of entity; heuristics are drawn dashed and are leads, not proof."
         actions={
           <>
+            <SegmentedControl
+              label="Graph mode"
+              value={mode}
+              onChange={setMode}
+              options={[
+                { value: "simple", label: "Simple" },
+                { value: "advanced", label: "Advanced" },
+              ]}
+            />
             <div className="relative">
               <Search
                 size={13}
@@ -217,97 +383,229 @@ export function GraphPage() {
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search nodes, entities, rules…"
+                placeholder="Search an entity, phone, device…"
                 className="w-56 pl-8 text-xs"
+                aria-label="Search graph"
               />
             </div>
-            <Select
-              value={classificationFilter}
-              onChange={(event) => setClassificationFilter(event.target.value)}
-              className="w-40 text-xs"
-            >
-              <option value="all">All classifications</option>
-              <option value="observation">Observation</option>
-              <option value="correlation">Correlation</option>
-              <option value="inference">Inference</option>
-              <option value="hypothesis">Hypothesis</option>
-            </Select>
-            <Button
-              variant={includeTemporal ? "primary" : "secondary"}
-              icon={<RefreshCcw size={14} />}
-              onClick={() => setIncludeTemporal((current) => !current)}
-            >
-              {includeTemporal ? "Temporal leads on" : "Include temporal leads"}
+            <Button variant="secondary" icon={<RotateCcw size={14} />} onClick={resetView}>
+              Reset view
             </Button>
-            <Select
-              value={layout}
-              onChange={(event) => setLayout(event.target.value)}
-              className="w-40 text-xs"
-            >
-              <option value="cose">COSE layout</option>
-              <option value="circle">Circle layout</option>
-              <option value="grid">Grid layout</option>
-              <option value="breadthfirst">Breadth-first</option>
-            </Select>
           </>
         }
       />
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
-        <Card>
+      {simple ? (
+        <div className="mb-4 rounded-xl border border-accent/20 bg-accent/5 px-4 py-3 text-xs leading-relaxed text-secondary">
+          <span className="font-semibold text-accent">Simple mode: </span>
+          {importantEntityIds.size > 0
+            ? `Showing ${importantEntityIds.size} entities that have a documented connection, and only those connections. Switch to Advanced to see raw events and evidence files.`
+            : "No documented entity-to-entity connections yet. Parse evidence or enable temporal leads to find candidates."}
+        </div>
+      ) : null}
+
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <Card className="min-w-0">
           <CardHeader
             title="Graph canvas"
-            subtitle={`${nodes.length} nodes · ${edges.length} edges`}
+            subtitle={`${visibleCounts.nodeCount} of ${nodes.filter((node) => {
+              const category = nodeCategory(node);
+              return category !== "evidence" && category !== "event";
+            }).length || nodes.length} nodes · ${visibleCounts.edgeCount} of ${edges.length} connections shown`}
             action={
               <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted">
-                <Toggle label="Evidence" checked={showEvidence} onChange={setShowEvidence} />
-                <Toggle label="Events" checked={showEvents} onChange={setShowEvents} />
+                {!simple ? (
+                  <>
+                    <Toggle label="Evidence" checked={showEvidence} onChange={setShowEvidence} />
+                    <Toggle label="Events" checked={showEvents} onChange={setShowEvents} />
+                  </>
+                ) : null}
                 <Toggle label="Entities" checked={showEntities} onChange={setShowEntities} />
+                {!simple ? (
+                  <Toggle
+                    label="Raw edges"
+                    checked={showConnections}
+                    onChange={setShowConnections}
+                  />
+                ) : null}
+                <Select
+                  value={layout}
+                  onChange={(event) => setLayout(event.target.value)}
+                  className="w-32 text-xs"
+                  aria-label="Graph layout"
+                >
+                  <option value="cose">COSE</option>
+                  <option value="circle">Circle</option>
+                  <option value="grid">Grid</option>
+                  <option value="breadthfirst">Breadth-first</option>
+                </Select>
               </div>
             }
           />
           <CardBody className="p-0">
-            {nodes.length === 0 ? (
+            {visibleElements.length === 0 ? (
               <div className="p-6">
                 <EmptyState
-                  title="No graph data"
-                  description="Parse evidence and run reconciliation to build relationships."
+                  title="Nothing matches these filters"
+                  description="Reset the view, or switch to Advanced mode to see raw events and evidence."
                   icon={GitBranch}
+                  action={
+                    <Button size="sm" variant="secondary" onClick={resetView}>
+                      Reset view
+                    </Button>
+                  }
                 />
               </div>
             ) : (
               <CytoscapeCanvas
                 elements={visibleElements}
                 layout={layout}
+                mode={mode}
                 onSelect={setSelected}
+                onHover={setHover}
               />
             )}
+            {hover ? (
+              <div className="border-t border-line bg-surface-2/60 px-4 py-2 text-[11px] leading-relaxed text-secondary">
+                {hover}
+              </div>
+            ) : null}
           </CardBody>
         </Card>
 
         <div className="space-y-4">
           <Card>
-            <CardHeader title="Legend" subtitle="Relationship and node types" />
-            <CardBody className="space-y-2 text-[11px] text-muted">
-              <Legend color={nodeColors.evidence} label="Evidence file" />
-              <Legend color={nodeColors.event} label="Extracted event" />
-              <Legend color={nodeColors.upi_vpa} label="Entity (VPA, phone, UTR, …)" />
-              <div className="my-2 h-px bg-surface-2" />
-              <Legend line color={palette.exact} label="Exact identifier match" />
-              <Legend line color={palette.conflict} label="Conflict / discrepancy" />
-              <Legend line dashed color={palette.heuristic} label="Heuristic temporal lead" />
-              <Legend line color={palette.edge} label="Containment / extraction" />
+            <CardHeader title="Filters" subtitle="Narrow the graph to what matters" />
+            <CardBody className="space-y-3 text-[11px] text-muted">
+              <label className="block">
+                <span className="mb-1 block font-semibold uppercase tracking-wider">
+                  Evidence source
+                </span>
+                <Select
+                  value={evidenceFilter}
+                  onChange={(event) => setEvidenceFilter(event.target.value)}
+                  className="w-full text-xs"
+                >
+                  <option value="all">All sources</option>
+                  {(evidenceQuery.data ?? []).map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.original_filename}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block font-semibold uppercase tracking-wider">
+                  Review status
+                </span>
+                <Select
+                  value={reviewFilter}
+                  onChange={(event) => setReviewFilter(event.target.value)}
+                  className="w-full text-xs"
+                >
+                  <option value="all">All connections</option>
+                  <option value="unreviewed">Unreviewed</option>
+                  <option value="accepted">Accepted</option>
+                  <option value="needs_review">Needs review</option>
+                  <option value="rejected">Rejected</option>
+                </Select>
+              </label>
+              <Button
+                variant={includeTemporal ? "primary" : "secondary"}
+                icon={<Waypoints size={14} />}
+                onClick={() => setIncludeTemporal((current) => !current)}
+                className="w-full"
+              >
+                {includeTemporal ? "Temporal leads on" : "Include temporal leads"}
+              </Button>
+              {includeTemporal ? (
+                <p className="rounded-lg border border-amber-200 bg-amber-50/80 p-2 leading-relaxed text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/5 dark:text-amber-100/80">
+                  Temporal proximity is shown dashed. Two things happening close
+                  together is a lead, never proof of a connection.
+                </p>
+              ) : null}
             </CardBody>
           </Card>
 
           <Card>
-            <CardHeader title="Selection" subtitle="Click a node or edge" />
+            <CardHeader
+              title="Connections list"
+              subtitle="Keyboard-accessible alternative to the canvas"
+            />
+            <CardBody>
+              <ul className="max-h-56 space-y-1 overflow-auto pr-1 text-[11px]">
+                {nodes
+                  .filter((node) => {
+                    const category = nodeCategory(node);
+                    return (
+                      visibleElements.some((element) => element.data.id === node.id) &&
+                      category !== "evidence" &&
+                      category !== "event"
+                    );
+                  })
+                  .slice(0, 40)
+                  .map((node) => (
+                    <li key={node.id}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelected({
+                            kind: "node",
+                            data: {
+                              ...node.data,
+                              id: node.id,
+                              label: node.label,
+                              node_type: node.node_type,
+                              category: nodeCategory(node),
+                              type_label:
+                                NODE_LABELS[nodeCategory(node)] ?? humanize(nodeCategory(node)),
+                            },
+                          })
+                        }
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-secondary transition hover:bg-surface-2/60 hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                      >
+                        <span className="text-[9px] uppercase tracking-wider text-muted">
+                          {NODE_LABELS[nodeCategory(node)] ?? humanize(nodeCategory(node))}
+                        </span>
+                        <span className="truncate">{node.label}</span>
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+              {visibleElements.length === 0 ? (
+                <p className="text-[11px] text-muted">No nodes match the current filters.</p>
+              ) : null}
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="Legend" subtitle="Shape and colour identify entity types" />
+            <CardBody className="space-y-2 text-[11px] text-muted">
+              <LegendShape color={nodeColors.evidence} label="Evidence file" shape="round-rectangle" />
+              <LegendShape color={nodeColors.event} label="Extracted event" shape="ellipse" />
+              <LegendShape color={nodeColors.phone} label="Phone number" shape="circle" />
+              <LegendShape color={nodeColors.device} label="Device" shape="round-rectangle" />
+              <LegendShape color={nodeColors.upi_vpa} label="UPI / account identifier" shape="diamond" />
+              <LegendShape color={nodeColors.ip} label="IP address" shape="hexagon" />
+              <LegendShape color={nodeColors.username} label="User account" shape="triangle" />
+              <LegendShape color={nodeColors.email} label="Email address" shape="ellipse" />
+              <div className="my-2 h-px bg-surface-2" />
+              <LegendLine color={palette.exact} label="Exact identifier / documented" />
+              <LegendLine color={palette.conflict} label="Conflict or discrepancy" />
+              <LegendLine color={palette.heuristic} dashed label="Heuristic lead" />
+              <LegendLine color={palette.edge} label="Extraction / containment" />
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="Selection" subtitle="Click a node or a line to understand it" />
             <CardBody>
               {!selected && focusType === "relationship" && focusId ? (
                 <RelationshipEvidencePanel caseId={caseId} relationshipId={focusId} />
               ) : !selected ? (
-                <p className="text-xs text-muted">
-                  Select a node or edge to inspect its explanation and supporting records.
+                <p className="text-xs leading-relaxed text-muted">
+                  Select a node to see what it represents, or select a line to see
+                  the evidence behind the connection.
                 </p>
               ) : selected.kind === "edge" &&
                 typeof selected.data.relationship_id === "string" ? (
@@ -316,35 +614,211 @@ export function GraphPage() {
                   relationshipId={selected.data.relationship_id}
                 />
               ) : (
-                <div className="space-y-3">
-                  <Badge className="border-accent/30 bg-accent/10 text-accent">
-                    {selected.kind}
-                  </Badge>
-                  {selected.kind === "node" ? (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setNeighbourFocus((current) => !current)}
-                    >
-                      {neighbourFocus ? "Show full graph" : "Focus neighbours"}
-                    </Button>
-                  ) : null}
-                  <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-line bg-surface-2/60 p-3 font-mono text-[10px] leading-relaxed text-secondary">
-                    {JSON.stringify(selected.data, null, 2)}
-                  </pre>
-                  {selected.kind === "edge" ? (
-                    <div className="rounded-lg border border-amber-200 dark:border-amber-500/20 bg-amber-50/80 dark:bg-amber-500/5 p-3 text-[11px] leading-relaxed text-amber-800/80 dark:text-amber-100/80">
-                      <Info size={12} className="mr-1 inline" />
-                      Only exact identifier matches and deterministic conflicts are treated as
-                      direct relationships. Temporal or fuzzy links are investigative leads.
-                    </div>
-                  ) : null}
-                </div>
+                <SelectionPanel
+                  caseId={caseId}
+                  selected={selected}
+                  nodes={nodes}
+                  edges={edges}
+                  evidenceNames={evidenceNames}
+                  neighbourFocus={neighbourFocus}
+                  onToggleNeighbour={() => setNeighbourFocus((current) => !current)}
+                />
               )}
             </CardBody>
           </Card>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SelectionPanel({
+  caseId,
+  selected,
+  nodes,
+  edges,
+  evidenceNames,
+  neighbourFocus,
+  onToggleNeighbour,
+}: {
+  caseId: string;
+  selected: SelectedElement;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  evidenceNames: Map<string, string>;
+  neighbourFocus: boolean;
+  onToggleNeighbour: () => void;
+}) {
+  const nodeId = String(selected.data.id);
+  const isNode = selected.kind === "node";
+  const entityId =
+    isNode && String(selected.data.node_type) === "entity"
+      ? String(selected.data.entity_id ?? "")
+      : "";
+  const entityQuery = useEntityDetail(caseId, entityId || null);
+  const category = isNode
+    ? String(selected.data.category ?? selected.data.node_type ?? "node")
+    : "connection";
+
+  const incident = useMemo(
+    () =>
+      isNode
+        ? edges.filter((edge) => edge.source === nodeId || edge.target === nodeId)
+        : [],
+    [edges, isNode, nodeId],
+  );
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge className="border-accent/30 bg-accent/10 text-accent">
+          {isNode ? "Node" : "Connection"}
+        </Badge>
+        <Badge className="border-line-strong bg-surface-2/70 capitalize text-secondary">
+          {NODE_LABELS[category] ?? humanize(category)}
+        </Badge>
+        {selected.data.classification ? (
+          <Badge className="border-line-strong bg-surface-2/70 capitalize text-muted">
+            {humanize(String(selected.data.classification))}
+          </Badge>
+        ) : null}
+      </div>
+
+      {isNode ? (
+        <>
+          <div>
+            <p className="text-sm font-medium text-primary">
+              {String(selected.data.label ?? selected.data.id)}
+            </p>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
+              This is a {String(
+                selected.data.type_label ?? NODE_LABELS[category] ?? category,
+              ).toLowerCase()} recorded in this case.
+            </p>
+          </div>
+
+          {entityQuery.data ? (
+            <dl className="grid grid-cols-2 gap-2 rounded-lg border border-line bg-surface-2/40 p-2.5 text-[11px]">
+              <div>
+                <dt className="text-muted">Mentions</dt>
+                <dd className="font-mono text-secondary">{entityQuery.data.mention_count}</dd>
+              </div>
+              <div>
+                <dt className="text-muted">Evidence sources</dt>
+                <dd className="font-mono text-secondary">
+                  {entityQuery.data.evidence_ids.length}
+                </dd>
+              </div>
+              {entityQuery.data.entity.first_seen_at ? (
+                <div className="col-span-2">
+                  <dt className="text-muted">First seen</dt>
+                  <dd className="text-secondary">
+                    {formatDateTime(entityQuery.data.entity.first_seen_at)}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          ) : null}
+
+          <div>
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
+              Connected to {incident.length} record{incident.length === 1 ? "" : "s"}
+            </p>
+            <ul className="max-h-52 space-y-1.5 overflow-auto pr-1">
+              {incident.slice(0, 12).map((edge) => {
+                const other = edge.source === nodeId ? edge.target : edge.source;
+                const otherNode = nodes.find((node) => node.id === other);
+                return (
+                  <li
+                    key={edge.id}
+                    className="rounded-lg border border-line bg-surface-2/40 px-2.5 py-1.5 text-[11px]"
+                  >
+                    <p className="font-medium text-secondary">{edge.label}</p>
+                    <p className="mt-0.5 text-muted">
+                      {otherNode?.label ?? other.replace(/^[^:]+:/, "")}
+                    </p>
+                  </li>
+                );
+              })}
+              {incident.length === 0 ? (
+                <li className="text-[11px] text-muted">
+                  No documented connections for this node.
+                </li>
+              ) : null}
+            </ul>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="secondary" onClick={onToggleNeighbour}>
+              {neighbourFocus ? "Show full graph" : "Focus on this entity"}
+            </Button>
+            {entityId ? (
+              <Link to={`/cases/${caseId}/entities?entityId=${entityId}`}>
+                <Button size="sm" variant="ghost" icon={<ArrowRight size={12} />}>
+                  Open entity
+                </Button>
+              </Link>
+            ) : null}
+            <Link to={`/cases/${caseId}/timeline`}>
+              <Button size="sm" variant="ghost">
+                Timeline
+              </Button>
+            </Link>
+          </div>
+        </>
+      ) : (
+        <>
+          <div>
+            <p className="text-sm font-medium text-primary">
+              {String(selected.data.label ?? "Connection")}
+            </p>
+            <p className="mt-1 text-[11px] leading-relaxed text-secondary">
+              {String(selected.data.explanation ?? "No explanation stored.")}
+            </p>
+          </div>
+          <dl className="grid grid-cols-2 gap-2 rounded-lg border border-line bg-surface-2/40 p-2.5 text-[11px]">
+            <div>
+              <dt className="text-muted">Kind</dt>
+              <dd className="text-secondary">
+                {String(selected.data.match_method ?? "unknown")}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted">Confidence</dt>
+              <dd className="text-secondary">
+                {humanize(String(selected.data.confidence ?? "unknown"))}
+              </dd>
+            </div>
+          </dl>
+          <div>
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted">
+              Supporting evidence
+            </p>
+            <ul className="space-y-1 text-[11px] text-muted">
+              {(
+                (selected.data.supporting_evidence_ids as string[] | undefined) ?? []
+              ).slice(0, 8).map((id) => (
+                <li key={id}>
+                  <Link
+                    to={`/cases/${caseId}/evidence?evidenceId=${id}`}
+                    className="text-accent hover:text-accent-strong"
+                  >
+                    {evidenceNames.get(id) ?? id}
+                  </Link>
+                </li>
+              ))}
+              {((selected.data.supporting_evidence_ids as string[] | undefined) ?? [])
+                .length === 0 ? <li>No linked evidence recorded.</li> : null}
+            </ul>
+          </div>
+          {selected.data.match_method === "heuristic" ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-2.5 text-[11px] leading-relaxed text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/5 dark:text-amber-100/80">
+              <Info size={12} className="mr-1 inline" />
+              This line is a heuristic lead, not a proven relationship.
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
@@ -371,32 +845,55 @@ function Toggle({
   );
 }
 
-function Legend({
+function LegendLine({
   color,
   label,
-  line,
   dashed,
 }: {
   color: string;
   label: string;
-  line?: boolean;
   dashed?: boolean;
 }) {
   return (
     <div className="flex items-center gap-2">
-      {line ? (
-        <span
-          className={cn("h-0.5 w-6", dashed && "opacity-80")}
-          style={{
-            backgroundImage: dashed
-              ? `repeating-linear-gradient(90deg, ${color} 0 4px, transparent 4px 8px)`
-              : undefined,
-            backgroundColor: dashed ? undefined : color,
-          }}
-        />
-      ) : (
-        <span className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
-      )}
+      <span
+        className="h-0.5 w-6"
+        style={{
+          backgroundImage: dashed
+            ? `repeating-linear-gradient(90deg, ${color} 0 4px, transparent 4px 8px)`
+            : undefined,
+          backgroundColor: dashed ? undefined : color,
+        }}
+      />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function LegendShape({
+  color,
+  label,
+  shape,
+}: {
+  color: string;
+  label: string;
+  shape: string;
+}) {
+  const radius =
+    shape === "circle" || shape === "ellipse"
+      ? "9999px"
+      : shape === "triangle"
+        ? "0"
+        : shape === "diamond"
+          ? "2px"
+          : "3px";
+  const rotate = shape === "diamond" ? "rotate-45" : "";
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className={cn("block h-3 w-3", rotate)}
+        style={{ backgroundColor: color, borderRadius: radius }}
+      />
       <span>{label}</span>
     </div>
   );
@@ -405,16 +902,21 @@ function Legend({
 function CytoscapeCanvas({
   elements,
   layout,
+  mode,
   onSelect,
+  onHover,
 }: {
   elements: ElementDefinition[];
   layout: string;
+  mode: GraphMode;
   onSelect: (selected: SelectedElement | null) => void;
+  onHover: (text: string | null) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const { theme } = useTheme();
   const palette = GRAPH_PALETTES[theme];
+  const simple = mode === "simple";
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -439,13 +941,13 @@ function CytoscapeCanvas({
             "border-color": palette.border,
           },
         },
+        ...Object.entries(NODE_SHAPES).map(([category, shape]) => ({
+          selector: `node[category = "${category}"]`,
+          style: { shape: shape as cytoscape.Css.NodeShape },
+        })),
         {
           selector: 'node[node_type = "evidence"]',
-          style: { shape: "round-rectangle", width: 34, height: 24 },
-        },
-        {
-          selector: 'node[node_type = "entity"]',
-          style: { shape: "diamond", width: 24, height: 24 },
+          style: { width: 34, height: 24 },
         },
         {
           selector: "edge",
@@ -455,7 +957,16 @@ function CytoscapeCanvas({
             "target-arrow-color": palette.edge,
             "target-arrow-shape": "triangle",
             "curve-style": "bezier",
-            opacity: 0.8,
+            opacity: 0.85,
+            label: simple ? "data(label)" : "",
+            "font-size": 7,
+            "text-rotation": "autorotate",
+            "text-background-color": palette.border,
+            "text-background-opacity": 0.85,
+            "text-background-padding": "2px",
+            color: palette.edgeLabel,
+            "text-max-width": "120px",
+            "text-wrap": "ellipsis",
           },
         },
         {
@@ -518,6 +1029,14 @@ function CytoscapeCanvas({
             opacity: 0.6,
           },
         },
+        {
+          selector: "node:selected",
+          style: { "border-width": 3, "border-color": palette.exact },
+        },
+        {
+          selector: "edge:selected",
+          style: { width: 3, opacity: 1 },
+        },
       ],
       layout: { name: "cose", fit: true, padding: 40 },
       minZoom: 0.2,
@@ -533,13 +1052,25 @@ function CytoscapeCanvas({
     cy.on("tap", (event) => {
       if (event.target === cy) onSelect(null);
     });
+    cy.on("mouseover", "edge", (event) => {
+      onHover(String(event.target.data("explanation") ?? ""));
+    });
+    cy.on("mouseout", "edge", () => onHover(null));
+    cy.on("mouseover", "node", (event) => {
+      onHover(
+        `${String(event.target.data("type_label") ?? "Node")}: ${String(
+          event.target.data("label") ?? "",
+        )}`,
+      );
+    });
+    cy.on("mouseout", "node", () => onHover(null));
 
     cyRef.current = cy;
     return () => {
       cy.destroy();
       cyRef.current = null;
     };
-  }, [onSelect, theme, palette]);
+  }, [onSelect, onHover, theme, palette, simple]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -551,5 +1082,5 @@ function CytoscapeCanvas({
     layoutInstance.one("layoutstop", () => cy.fit(undefined, 40));
   }, [elements, layout]);
 
-  return <div ref={containerRef} className="graph-canvas h-[620px] w-full" />;
+  return <div ref={containerRef} className="graph-canvas h-[420px] w-full sm:h-[620px]" />;
 }

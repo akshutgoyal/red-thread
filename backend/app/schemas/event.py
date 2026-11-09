@@ -38,6 +38,8 @@ class TimelineResponse(BaseModel):
     items: list[EventRead]
     undated: list[EventRead]
     total: int
+    event_meta: dict[str, Any] = {}
+    groups: list[Any] = []
 
 
 class EntityRead(BaseModel):

@@ -36,6 +36,16 @@ services:
         sync: false
       - key: RED_THREAD_CORS_ORIGINS
         sync: false
+      - key: RED_THREAD_SESSION_SECRET
+        sync: false
+      - key: RED_THREAD_TRUSTED_PROXY_HOPS
+        value: "1"
+      - key: RED_THREAD_EXPOSE_API_DOCS
+        value: "false"
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: ISOQUANT_API_KEY
+        sync: false
       - key: TOKENHARBOR_API_KEY
         sync: false
       - key: R2_ACCOUNT_ID

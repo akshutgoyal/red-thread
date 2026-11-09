@@ -36,6 +36,9 @@ class FindingRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     evidence_links: list[FindingEvidenceRead] = []
+    related_entities: list[dict] = []
+    timeline_refs: list[dict] = []
+    classification: str = "observation"
 
 
 class FindingListResponse(BaseModel):

@@ -19,10 +19,11 @@ def create_case(
     principal: AuthPrincipal | None = Depends(get_principal),
 ) -> CaseRead:
     is_demo = bool(principal and principal.is_demo)
+    owner_id = None if principal is None or principal.is_demo else principal.user_id
     case = case_service.create_case(
         db,
         payload,
-        owner_id=principal.user_id if principal is not None else None,
+        owner_id=owner_id,
         is_demo=is_demo,
     )
     audit_service.record(
@@ -43,6 +44,8 @@ def list_cases(
 ) -> list[CaseSummary]:
     if principal is None:
         cases = case_service.list_cases(db)
+    elif principal.is_demo:
+        cases = case_service.list_cases(db, demo_templates=True)
     else:
         cases = case_service.list_cases(db, owner_id=principal.user_id)
     return [case_service.summarize_case(db, case) for case in cases]

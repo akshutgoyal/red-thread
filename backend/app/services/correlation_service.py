@@ -7,6 +7,36 @@ from sqlalchemy.orm import Session, selectinload
 from ..models import Event, EventEntity, Evidence, GraphEdge, Relationship
 from ..schemas.event import GraphEdgeRead, GraphNodeRead, GraphResponse
 
+EDGE_LABELS = {
+    "evidence_contains_event": "Contains event",
+    "co_mention": "Appears in the same event",
+    "shared_identifier": "Same identifier in both sources",
+    "temporal_association": "Occurs close in time",
+    "temporal_proximity": "Occurs close in time",
+    "spatial_proximity": "Documented nearby",
+    "communication_sequence": "Communication sequence",
+    "device_auth_context": "Device or sign-in context",
+    "geo_velocity_anomaly": "Implausible travel speed",
+    "cctv_coverage_gap": "Recording coverage gap",
+}
+
+
+def relationship_label(edge_type: str | None) -> str:
+    """Return a human sentence for an edge type.
+
+    The graph, the relationship panel and the report all read this mapping so a
+    connection is described the same way everywhere.
+    """
+
+    if not edge_type:
+        return "Related"
+    if edge_type in EDGE_LABELS:
+        return EDGE_LABELS[edge_type]
+    if edge_type.startswith("event_mentions_"):
+        role = edge_type.removeprefix("event_mentions_").replace("_", " ")
+        return f"Mentions {role}".strip()
+    return edge_type.replace("_", " ").capitalize()
+
 
 def build_graph(
     db: Session,
@@ -234,7 +264,7 @@ def build_graph(
                 id=edge_id,
                 source=source,
                 target=target,
-                label=data.get("edge_type", "related"),
+                label=relationship_label(data.get("edge_type")),
                 edge_type=data.get("edge_type", "related"),
                 match_method=data.get("match_method", "unknown"),
                 explanation=data.get("explanation", ""),

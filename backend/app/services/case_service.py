@@ -32,9 +32,12 @@ def list_cases(
     *,
     owner_id: str | None = None,
     is_demo: bool | None = None,
+    demo_templates: bool = False,
 ) -> list[Case]:
     statement = select(Case)
-    if is_demo is True:
+    if demo_templates:
+        statement = statement.where(Case.is_demo.is_(True), Case.owner_id.is_(None))
+    elif is_demo is True:
         statement = statement.where(Case.is_demo.is_(True))
     elif owner_id:
         statement = statement.where(Case.owner_id == owner_id)

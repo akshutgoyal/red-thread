@@ -93,15 +93,22 @@ class GenericCsvParser(BaseParser):
         rows = [dict(row) for row in frame.to_dict(orient="records")]
         events: list[CanonicalEventDraft] = []
         warnings: list[ParseWarning] = []
+        mapping = context.column_mapping or {}
         for index, row in enumerate(rows):
             normalized = {
                 str(key).strip().lower().replace(" ", "_"): value
                 for key, value in row.items()
                 if key is not None
             }
-            timestamp_raw = next(
-                (normalized[key] for key in TIMESTAMP_KEYS if normalized.get(key)), None
-            )
+            mapped_timestamp_column = mapping.get("timestamp")
+            if mapped_timestamp_column:
+                timestamp_raw = row.get(mapped_timestamp_column) or None
+                if timestamp_raw is not None:
+                    timestamp_raw = str(timestamp_raw).strip() or None
+            else:
+                timestamp_raw = next(
+                    (normalized[key] for key in TIMESTAMP_KEYS if normalized.get(key)), None
+                )
             timestamp = parse_flexible_timestamp(
                 timestamp_raw,
                 default_timezone=context.timezone,
@@ -118,7 +125,18 @@ class GenericCsvParser(BaseParser):
                     timestamp_timezone=timestamp.timezone_name,
                     source_locator=f"row:{index + 2}",
                     source_snippet=json.dumps(row, ensure_ascii=False)[:2000],
-                    attributes={"columns": {key: _json_safe(value) for key, value in normalized.items()}},
+                    attributes={
+                        "columns": {key: _json_safe(value) for key, value in normalized.items()},
+                        **(
+                            {
+                                field: str(row.get(column))
+                                for field, column in mapping.items()
+                                if column in row
+                            }
+                            if mapping
+                            else {}
+                        ),
+                    },
                     entities=_entities(combined),
                     warnings=list(timestamp.warnings) if timestamp_raw else [],
                 )
@@ -130,7 +148,12 @@ class GenericCsvParser(BaseParser):
             parser_version=self.version,
             events=events,
             warnings=warnings,
-            metadata={"rows_parsed": len(events), "columns": list(frame.columns)},
+            metadata={
+                "rows_parsed": len(events),
+                "columns": list(frame.columns),
+                "column_mapping": mapping,
+                "records_total": len(rows),
+            },
         )
 
 
@@ -142,6 +165,7 @@ class GenericJsonParser(BaseParser):
     def parse(self, path: Path, context: ParserContext) -> ParseResult:
         events: list[CanonicalEventDraft] = []
         warnings: list[ParseWarning] = []
+        mapping = context.column_mapping or {}
         if path.suffix.lower() == ".jsonl":
             rows = []
             for line_number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), start=1):
@@ -190,9 +214,15 @@ class GenericJsonParser(BaseParser):
             normalized = {
                 str(key).strip().lower().replace(" ", "_"): value for key, value in row.items()
             }
-            timestamp_raw = next(
-                (normalized[key] for key in TIMESTAMP_KEYS if normalized.get(key)), None
-            )
+            mapped_timestamp_column = mapping.get("timestamp")
+            if mapped_timestamp_column:
+                timestamp_raw = row.get(mapped_timestamp_column) or None
+                if timestamp_raw is not None:
+                    timestamp_raw = str(timestamp_raw).strip() or None
+            else:
+                timestamp_raw = next(
+                    (normalized[key] for key in TIMESTAMP_KEYS if normalized.get(key)), None
+                )
             timestamp = parse_flexible_timestamp(
                 timestamp_raw,
                 default_timezone=context.timezone,
@@ -209,7 +239,18 @@ class GenericJsonParser(BaseParser):
                     timestamp_timezone=timestamp.timezone_name,
                     source_locator=f"record:{index}",
                     source_snippet=json.dumps(row, ensure_ascii=False, default=str)[:2000],
-                    attributes={"record": {key: _json_safe(value) for key, value in normalized.items()}},
+                    attributes={
+                        "record": {key: _json_safe(value) for key, value in normalized.items()},
+                        **(
+                            {
+                                field: str(row.get(column))
+                                for field, column in mapping.items()
+                                if column in row
+                            }
+                            if mapping
+                            else {}
+                        ),
+                    },
                     entities=_entities(combined),
                     warnings=list(timestamp.warnings) if timestamp_raw else [],
                 )
@@ -219,5 +260,9 @@ class GenericJsonParser(BaseParser):
             parser_version=self.version,
             events=events,
             warnings=warnings,
-            metadata={"records_parsed": len(events)},
+            metadata={
+                "records_parsed": len(events),
+                "column_mapping": mapping,
+                "records_total": len(rows),
+            },
         )

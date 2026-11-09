@@ -28,6 +28,7 @@ from ..models import (
     AiQuery,
     AuditEvent,
     Case,
+    Entity,
     Event,
     Evidence,
     Finding,
@@ -195,6 +196,14 @@ def _load_report_data(db: Session, case: Case) -> dict[str, Any]:
             .order_by(ReviewDecision.created_at.asc())
         )
     )
+    entities = list(
+        db.scalars(
+            select(Entity)
+            .where(Entity.case_id == case.id)
+            .order_by(Entity.entity_type.asc(), Entity.value_original.asc())
+        )
+    )
+    entity_counts = dict(Counter(item.entity_type for item in entities))
     relationship_types = dict(Counter(item.relationship_type for item in relationships))
     review_summary = dict(Counter(item.review_status for item in relationships))
     undated_events = sum(1 for event in events if event.timestamp_normalized is None)
@@ -211,6 +220,16 @@ def _load_report_data(db: Session, case: Case) -> dict[str, Any]:
         unresolved.append("No deterministic relationships have been generated yet.")
     if not spatial_observations:
         unresolved.append("No documented coordinates are available for spatial reconstruction.")
+    if not annotations:
+        unresolved.append("No investigator annotations have been recorded for this case.")
+    disputed = sum(1 for item in relationships if item.review_status == "rejected")
+    if disputed:
+        unresolved.append(f"{disputed} proposed relationship(s) were rejected and remain recorded.")
+    conflict_findings = [item for item in findings if item.category == "conflict"]
+    if conflict_findings:
+        unresolved.append(
+            f"{len(conflict_findings)} conflicting record(s) require human reconciliation."
+        )
 
     return {
         "case": {
@@ -337,6 +356,56 @@ def _load_report_data(db: Session, case: Case) -> dict[str, Any]:
                 ],
             }
             for relationship in relationships
+        ],
+        "parsing_summary": [
+            {
+                "evidence_id": item.id,
+                "filename": item.original_filename,
+                "processing_status": item.processing_status,
+                "parser": item.parser_name,
+                "parser_version": item.parser_version,
+                "processing_error": item.processing_error,
+                "event_count": sum(1 for event in events if event.evidence_id == item.id),
+                "warning_count": sum(
+                    len(event.warnings_json or []) for event in events if event.evidence_id == item.id
+                ),
+            }
+            for item in evidence
+        ],
+        "entity_summary": {
+            "count": len(entities),
+            "by_type": entity_counts,
+            "entities": [
+                {
+                    "id": item.id,
+                    "entity_type": item.entity_type,
+                    "value": item.value_original,
+                    "event_count": len(item.event_links),
+                }
+                for item in entities[:200]
+            ],
+        },
+        "conflict_findings": [
+            {
+                "id": item.id,
+                "title": item.title,
+                "severity": item.severity,
+                "category": item.category,
+                "explanation": item.explanation,
+                "status": item.status,
+                "confidence": item.confidence,
+                "reviewer_note": item.reviewer_note,
+                "evidence_links": [
+                    {
+                        "evidence_id": link.evidence_id,
+                        "event_id": link.event_id,
+                        "source_locator": link.source_locator,
+                    }
+                    for link in item.evidence_links
+                ],
+            }
+            for item in findings
+            if item.category == "conflict"
         ],
         "spatial_observations": spatial_observations,
         "annotations": [
@@ -535,7 +604,7 @@ def _build_pdf(path: Path, data: dict[str, Any]) -> None:
     if len(data["evidence"]) > 60:
         story.append(_paragraph("Inventory truncated for this PDF; see JSON report.", small_style))
 
-    story.append(_paragraph("2. Integrity verification summary", section_style))
+    story.append(_paragraph("4. Evidence integrity", section_style))
     verified = sum(1 for item in data["evidence"] if item["hash_verified"])
     story.append(
         _paragraph(
@@ -547,7 +616,50 @@ def _build_pdf(path: Path, data: dict[str, Any]) -> None:
         )
     )
 
-    story.append(_paragraph("3. Timeline events", section_style))
+    story.append(_paragraph("3. Parsing and extraction summary", section_style))
+    parsing_rows: list[list[Any]] = [
+        ["File", "Status", "Parser", "Events", "Warnings", "Error"]
+    ]
+    for item in data["parsing_summary"]:
+        parsing_rows.append(
+            [
+                _paragraph(item["filename"], small_style),
+                _paragraph(item["processing_status"], small_style),
+                _paragraph(
+                    f"{item['parser'] or '-'} {item['parser_version'] or ''}".strip(),
+                    small_style,
+                ),
+                _paragraph(str(item["event_count"]), small_style),
+                _paragraph(str(item["warning_count"]), small_style),
+                _paragraph(item["processing_error"] or "-", small_style),
+            ]
+        )
+    story.append(_table(parsing_rows, [38 * mm, 24 * mm, 30 * mm, 14 * mm, 18 * mm, 54 * mm], font_size=6.5))
+    story.append(Spacer(1, 8))
+
+    story.append(_paragraph("5. Entity summary", section_style))
+    entity_summary = data["entity_summary"]
+    if entity_summary["count"]:
+        summary_rows: list[list[Any]] = [["Entity type", "Count"]]
+        for entity_type, count in sorted(entity_summary["by_type"].items()):
+            summary_rows.append(
+                [_paragraph(entity_type, small_style), _paragraph(str(count), small_style)]
+            )
+        story.append(_table(summary_rows, [80 * mm, 30 * mm], font_size=7))
+        story.append(Spacer(1, 4))
+        story.append(
+            _paragraph(
+                f"{entity_summary['count']} distinct entities were extracted. Entity types "
+                "record what the parser observed; a shared value is not evidence that two "
+                "entities belong to the same person.",
+                body_style,
+            )
+        )
+    else:
+        story.append(_paragraph("No entities were extracted for this case.", body_style))
+    story.append(Spacer(1, 8))
+
+    story.append(_paragraph("6. Investigation timeline", section_style))
     event_rows: list[list[Any]] = [["Time (UTC)", "Event", "Source", "Confidence"]]
     for event in data["events"][:180]:
         event_rows.append(
@@ -574,7 +686,7 @@ def _build_pdf(path: Path, data: dict[str, Any]) -> None:
             )
         )
 
-    story.append(_paragraph("4. Findings for human review", section_style))
+    story.append(_paragraph("7. Findings for human review", section_style))
     if not data["findings"]:
         story.append(_paragraph("No findings were recorded.", body_style))
     for index, finding in enumerate(data["findings"], start=1):
@@ -619,7 +731,43 @@ def _build_pdf(path: Path, data: dict[str, Any]) -> None:
         story.append(KeepTogether(block))
         story.append(Spacer(1, 4))
 
-    story.append(_paragraph("5. Relationship graph summary", section_style))
+    story.append(_paragraph("7.1 Conflicting records", section_style))
+    if data["conflict_findings"]:
+        story.append(
+            _paragraph(
+                "The following findings record a discrepancy between two sources. A conflict "
+                "means the records disagree; it does not establish which record is correct.",
+                body_style,
+            )
+        )
+        story.append(Spacer(1, 4))
+        for index, conflict in enumerate(data["conflict_findings"], start=1):
+            story.append(
+                _paragraph(
+                    f"{index}. {conflict['title']} ({conflict['severity']}, "
+                    f"{conflict['status']})",
+                    small_style,
+                )
+            )
+            story.append(_paragraph(conflict["explanation"] or "-", body_style))
+            if conflict["reviewer_note"]:
+                story.append(
+                    _paragraph(f"Analyst note: {conflict['reviewer_note']}", small_style)
+                )
+            for link in conflict["evidence_links"][:6]:
+                story.append(
+                    _paragraph(
+                        f"Evidence: {link['evidence_id']} / "
+                        f"{link['event_id'] or '-'} / {link['source_locator'] or '-'}",
+                        small_style,
+                    )
+                )
+            story.append(Spacer(1, 4))
+    else:
+        story.append(_paragraph("No conflicting records were detected.", body_style))
+    story.append(Spacer(1, 8))
+
+    story.append(_paragraph("8. Entity relationship summary", section_style))
     story.append(
         _paragraph(
             f"{data['graph']['edge_count']} persisted relationship edge(s). "
@@ -648,7 +796,7 @@ def _build_pdf(path: Path, data: dict[str, Any]) -> None:
         )
     )
 
-    story.append(_paragraph("5.1 Provenance-backed relationships", section_style))
+    story.append(_paragraph("8.1 Provenance-backed relationships", section_style))
     story.append(
         _paragraph(
             f"{data['relationship_summary']['count']} deterministic relationship record(s). "
@@ -700,7 +848,7 @@ def _build_pdf(path: Path, data: dict[str, Any]) -> None:
     else:
         story.append(_paragraph("No deterministic relationships were generated.", body_style))
 
-    story.append(_paragraph("5.2 Documented spatial observations", section_style))
+    story.append(_paragraph("8.2 Documented spatial observations", section_style))
     if data["spatial_observations"]:
         spatial_rows: list[list[Any]] = [
             ["Time (UTC)", "Event", "Coordinates", "Label", "Source"]
@@ -732,7 +880,7 @@ def _build_pdf(path: Path, data: dict[str, Any]) -> None:
             )
         )
 
-    story.append(_paragraph("5.3 Investigator annotations and review decisions", section_style))
+    story.append(_paragraph("8.3 Investigator annotations and review decisions", section_style))
     if data["review_decisions"]:
         review_rows: list[list[Any]] = [["Time (UTC)", "Target", "Decision", "Reviewer", "Note"]]
         for item in data["review_decisions"][:120]:
@@ -766,7 +914,7 @@ def _build_pdf(path: Path, data: dict[str, Any]) -> None:
     for item in data["unresolved"]:
         story.append(_paragraph(f"- {item}", body_style))
 
-    story.append(_paragraph("6. AI-generated interpretations", section_style))
+    story.append(_paragraph("9. AI-generated interpretations", section_style))
     story.append(
         _paragraph(
             "The following section contains AI-generated text. It is not evidence and may be "
@@ -794,7 +942,7 @@ def _build_pdf(path: Path, data: dict[str, Any]) -> None:
         story.append(KeepTogether(block))
         story.append(Spacer(1, 4))
 
-    story.append(_paragraph("7. Audit trail summary", section_style))
+    story.append(_paragraph("10. Audit trail summary", section_style))
     audit_rows: list[list[Any]] = [["Time (UTC)", "Action", "Actor", "Evidence"]]
     for item in data["audit"][:120]:
         audit_rows.append(
@@ -809,11 +957,43 @@ def _build_pdf(path: Path, data: dict[str, Any]) -> None:
         audit_rows.append(["No audit events", "-", "-", "-"])
     story.append(_table(audit_rows, [38 * mm, 55 * mm, 30 * mm, 55 * mm], font_size=6.5))
 
-    story.append(_paragraph("8. Limitations and legal caution", section_style))
+    story.append(_paragraph("10.1 Unresolved questions", section_style))
+    if data["unresolved"]:
+        for item in data["unresolved"]:
+            story.append(_paragraph(f"- {item}", body_style))
+    else:
+        story.append(_paragraph("No outstanding questions were derived from the case state.", body_style))
+    story.append(Spacer(1, 8))
+
+    story.append(_paragraph("11. Limitations and legal caution", section_style))
     for limitation in data["limitations"]:
         story.append(_paragraph(f"- {limitation}", body_style))
 
-    story.append(_paragraph("9. Section 63 BSA preparation - DRAFT ONLY", section_style))
+    story.append(_paragraph("11.1 Conclusion", section_style))
+    accepted = sum(1 for item in data["relationships"] if item["review_status"] == "accepted")
+    rejected = sum(1 for item in data["relationships"] if item["review_status"] == "rejected")
+    story.append(
+        _paragraph(
+            f"This case contains {len(data['evidence'])} evidence file(s), "
+            f"{len(data['events'])} extracted event(s), {len(data['findings'])} finding(s), "
+            f"{data['relationship_summary']['count']} proposed relationship(s) and "
+            f"{len(data['annotations'])} investigator annotation(s). "
+            f"{accepted} relationship(s) were accepted by an investigator and {rejected} rejected.",
+            body_style,
+        )
+    )
+    story.append(
+        _paragraph(
+            "This report records what the tooling observed and what an investigator recorded. "
+            "It does not determine guilt, intent or legal responsibility, and no sequence in this "
+            "report should be read as a proven criminal narrative unless the cited evidence "
+            "establishes it.",
+            body_style,
+        )
+    )
+    story.append(Spacer(1, 8))
+
+    story.append(_paragraph("12. Section 63 BSA preparation - DRAFT ONLY", section_style))
     story.append(
         _paragraph(
             "This is a preparation template, not a signed certificate. It must be reviewed, "

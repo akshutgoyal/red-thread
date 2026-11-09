@@ -6,7 +6,8 @@ import {
   RefreshCcw,
   ShieldAlert,
 } from "lucide-react";
-import { useGenerateReport, useReports } from "@/hooks/useApi";
+import { useCase, useGuidance, useReports } from "@/hooks/useApi";
+import { useGenerateReport } from "@/hooks/useApi";
 import { api } from "@/api/client";
 import { useToast } from "@/components/ui/Toast";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -20,6 +21,8 @@ export function ReportsPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const toast = useToast();
   const reportsQuery = useReports(caseId);
+  const caseQuery = useCase(caseId);
+  const guidanceQuery = useGuidance(caseId);
   const generate = useGenerateReport(caseId ?? "");
 
   if (!caseId) return <ErrorState title="Missing case ID" />;
@@ -128,6 +131,68 @@ export function ReportsPage() {
             ))}
           </CardBody>
         )}
+      </Card>
+
+      <Card className="mt-5">
+        <CardHeader
+          title="Report preview"
+          subtitle="The document is built from the case state shown here"
+        />
+        <CardBody className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            {
+              title: "Case overview",
+              detail: caseQuery.data
+                ? `${caseQuery.data.title} · ${humanize(caseQuery.data.status)}`
+                : "Case metadata and status",
+            },
+            {
+              title: "Evidence inventory",
+              detail: guidanceQuery.data
+                ? `${guidanceQuery.data.summary.evidence} file(s), ${guidanceQuery.data.summary.parsed} processed`
+                : "Evidence and SHA-256 digests",
+            },
+            {
+              title: "Extraction summary",
+              detail: guidanceQuery.data
+                ? `${guidanceQuery.data.summary.events} event(s), ${guidanceQuery.data.summary.entities} entities`
+                : "Parser status and extracted records",
+            },
+            {
+              title: "Timeline",
+              detail: guidanceQuery.data
+                ? `${guidanceQuery.data.summary.events} dated event(s) in source order`
+                : "Events with source locators",
+            },
+            {
+              title: "Findings",
+              detail: guidanceQuery.data
+                ? `${guidanceQuery.data.summary.open_findings} open finding(s) awaiting review`
+                : "Rule-based findings and severity",
+            },
+            {
+              title: "Relationships",
+              detail: guidanceQuery.data
+                ? `${guidanceQuery.data.summary.unreviewed_relationships} unreviewed correlation(s)`
+                : "Correlations with provenance",
+            },
+            {
+              title: "Conflicts and unresolved questions",
+              detail: "Derived from the stored findings and case state",
+            },
+            {
+              title: "Limitations and conclusion",
+              detail: "Draft wording for human review, never an adjudication",
+            },
+          ].map((item) => (
+            <div key={item.title} className="rounded-lg border border-line bg-surface-2/30 px-3 py-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                {item.title}
+              </p>
+              <p className="mt-0.5 leading-relaxed text-secondary">{item.detail}</p>
+            </div>
+          ))}
+        </CardBody>
       </Card>
 
       <Card className="mt-5">

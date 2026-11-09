@@ -26,15 +26,19 @@ from ..schemas.event import (
     TimelineResponse,
 )
 from ..schemas.evidence import EvidenceRead, HashVerifyResponse, ParseResponse
+from ..utils.csv_safety import sanitize_csv_row
 from ..schemas.finding import FindingListResponse, FindingRead, FindingReviewRequest
 from ..services import (
     audit_service,
     correlation_service,
     evidence_service,
     investigation_service,
+    mapping_service,
+    narrative_service,
     reconciliation_service,
     storage_service,
 )
+from ..schemas.mapping import ColumnMappingRequest, ColumnMappingResponse
 
 router = APIRouter(tags=["evidence"])
 
@@ -175,6 +179,58 @@ def parse_evidence(
     )
 
 
+@router.get(
+    "/evidence/{evidence_id}/mapping",
+    response_model=ColumnMappingResponse,
+)
+def get_column_mapping(
+    evidence_id: str,
+    case_id: str = Depends(require_case_id),
+    db: Session = Depends(get_db),
+) -> ColumnMappingResponse:
+    evidence = get_evidence_or_404(db, evidence_id, case_id)
+    return ColumnMappingResponse(**mapping_service.mapping_preview(evidence))
+
+
+@router.put(
+    "/evidence/{evidence_id}/mapping",
+    response_model=ColumnMappingResponse,
+)
+def save_column_mapping(
+    evidence_id: str,
+    payload: ColumnMappingRequest,
+    case_id: str = Depends(require_case_id),
+    db: Session = Depends(get_db),
+) -> ColumnMappingResponse:
+    evidence = get_evidence_or_404(db, evidence_id, case_id)
+    headers = mapping_service.read_headers(evidence)
+    if headers is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Column mapping is only available for CSV, JSON and JSONL files.",
+        )
+    mapping = mapping_service.normalize_mapping(payload.mapping, headers)
+    if not mapping.get("timestamp"):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "A timestamp column is required. Events without a timestamp cannot "
+                "be placed on the timeline."
+            ),
+        )
+    evidence.metadata_json = {**(evidence.metadata_json or {}), "column_mapping": mapping}
+    audit_service.record(
+        db,
+        evidence.case_id,
+        "evidence.mapping_saved",
+        evidence_id=evidence.id,
+        details={"mapping": mapping},
+    )
+    db.commit()
+    db.refresh(evidence)
+    return ColumnMappingResponse(**mapping_service.mapping_preview(evidence))
+
+
 @router.get("/evidence/{evidence_id}/content")
 def evidence_content(
     evidence_id: str,
@@ -193,7 +249,14 @@ def evidence_content(
     return StreamingResponse(
         stream,
         media_type=evidence.media_type,
-        headers={"Content-Disposition": evidence_service.content_disposition(evidence)},
+        headers={
+            "Content-Disposition": evidence_service.content_disposition(evidence),
+            # Uploaded content is untrusted: never let a browser sniff it into
+            # an executable type, and isolate it from the app origin.
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+            "Cross-Origin-Resource-Policy": "same-origin",
+        },
     )
 
 
@@ -244,13 +307,26 @@ def list_events(
 def get_timeline(
     case_id: str,
     limit: int = Query(default=1000, ge=1, le=5000),
+    start: str | None = Query(default=None),
+    end: str | None = Query(default=None),
+    evidence_id: str | None = Query(default=None),
+    event_type: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> TimelineResponse:
     get_case_or_404(db, case_id)
+    filters = [Event.case_id == case_id]
+    if evidence_id:
+        filters.append(Event.evidence_id == evidence_id)
+    if event_type:
+        filters.append(Event.event_type == event_type)
+    if start:
+        filters.append(Event.timestamp_normalized >= _parse_datetime(start, "start"))
+    if end:
+        filters.append(Event.timestamp_normalized <= _parse_datetime(end, "end"))
     items = list(
         db.scalars(
             select(Event)
-            .where(Event.case_id == case_id, Event.timestamp_normalized.is_not(None))
+            .where(*filters, Event.timestamp_normalized.is_not(None))
             .order_by(Event.timestamp_normalized.asc())
             .limit(limit)
         )
@@ -258,12 +334,19 @@ def get_timeline(
     undated = list(
         db.scalars(
             select(Event)
-            .where(Event.case_id == case_id, Event.timestamp_normalized.is_(None))
+            .where(*filters, Event.timestamp_normalized.is_(None))
             .order_by(Event.created_at.asc())
             .limit(limit)
         )
     )
-    return TimelineResponse(items=items, undated=undated, total=len(items) + len(undated))
+    extras = narrative_service.timeline_extras(db, case_id, items + undated)
+    return TimelineResponse(
+        items=items,
+        undated=undated,
+        total=len(items) + len(undated),
+        event_meta=extras.event_meta,
+        groups=extras.groups,
+    )
 
 
 @router.get("/cases/{case_id}/entities", response_model=list[EntityRead])
@@ -324,6 +407,7 @@ def list_findings(
     severity: str | None = Query(default=None),
     status_value: str | None = Query(default=None, alias="status"),
     category: str | None = Query(default=None),
+    enrich: bool = Query(default=True),
     db: Session = Depends(get_db),
 ) -> FindingListResponse:
     get_case_or_404(db, case_id)
@@ -343,7 +427,28 @@ def list_findings(
     total = db.scalar(
         select(func.count()).select_from(select(Finding).where(*filters).subquery())
     ) or 0
-    return FindingListResponse(items=list(db.scalars(query)), total=total)
+    items = []
+    for finding in db.scalars(query):
+        read = FindingRead.model_validate(finding)
+        if enrich:
+            entities, timeline_refs = narrative_service.finding_context(db, case_id, finding)
+            read.related_entities = [item.model_dump() for item in entities]
+            read.timeline_refs = [item.model_dump() for item in timeline_refs]
+            read.classification = _finding_classification(finding)
+        items.append(read)
+    return FindingListResponse(items=items, total=total)
+
+
+def _finding_classification(finding: Finding) -> str:
+    method = (finding.detection_method or "").lower()
+    category = (finding.category or "").lower()
+    if "reconcil" in method or "conflict" in category or "discrep" in category:
+        return "inference"
+    if "match" in method or "identifier" in method or "shared" in method:
+        return "correlation"
+    if "auth" in method or "rule" in method:
+        return "observation"
+    return "observation"
 
 
 @router.post("/findings/{finding_id}/review", response_model=FindingRead)
@@ -464,7 +569,7 @@ def export_auth(
         for event in events:
             attributes = event.attributes_json or {}
             writer.writerow(
-                {
+                sanitize_csv_row({
                     "event_id": event.id,
                     "event_type": event.event_type,
                     "timestamp_raw": event.timestamp_raw,
@@ -486,7 +591,7 @@ def export_auth(
                     "session_event": attributes.get("session_event", ""),
                     "target_user": attributes.get("sudo_target_user", ""),
                     "command": attributes.get("sudo_command", ""),
-                }
+                })
             )
 
     if kind == "both":
@@ -499,7 +604,7 @@ def export_auth(
         finding_writer.writeheader()
         for finding in findings:
             finding_writer.writerow(
-                {
+                sanitize_csv_row({
                     "finding_id": finding.id,
                     "severity": finding.severity,
                     "title": finding.title,
@@ -513,7 +618,7 @@ def export_auth(
                         f"{link.evidence_id}:{link.source_locator}"
                         for link in finding.evidence_links
                     ),
-                }
+                })
             )
 
     return Response(

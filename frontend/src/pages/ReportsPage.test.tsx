@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   useReports: vi.fn(),
   useGenerateReport: vi.fn(),
+  useCase: vi.fn(),
+  useGuidance: vi.fn(),
   useToast: vi.fn(),
 }));
 
@@ -14,6 +16,8 @@ vi.mock("@/hooks/useApi", async (importOriginal) => {
     ...actual,
     useReports: mocks.useReports,
     useGenerateReport: mocks.useGenerateReport,
+    useCase: mocks.useCase,
+    useGuidance: mocks.useGuidance,
   };
 });
 vi.mock("@/components/ui/Toast", () => ({ useToast: mocks.useToast }));
@@ -27,6 +31,27 @@ describe("ReportsPage", () => {
     mutate.mockReset();
     mocks.useToast.mockReturnValue({ push: vi.fn() });
     mocks.useGenerateReport.mockReturnValue({ mutate, isPending: false });
+    mocks.useCase.mockReturnValue({
+      data: { title: "Operation Test", status: "open" },
+      isLoading: false,
+      error: null,
+    });
+    mocks.useGuidance.mockReturnValue({
+      data: {
+        summary: {
+          evidence: 3,
+          parsed: 3,
+          needs_attention: 0,
+          events: 12,
+          entities: 5,
+          open_findings: 2,
+          unreviewed_relationships: 1,
+          reports: 1,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
     mocks.useReports.mockReturnValue({
       data: [
         {

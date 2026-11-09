@@ -59,3 +59,33 @@ identifiers, 4 communication sequences, 2 device/auth contexts and 3 spatial pro
 - Spatial and temporal links are investigative leads, not proof.
 - AI output remains an interpretation requiring human verification.
 - `npm audit` reports 16 dependency findings; they require a separately reviewed upgrade.
+
+## Guided investigation experience (local verification)
+
+Verified against the three synthetic demo cases with local SQLite and the live demo seed:
+
+- **Guidance endpoint** (`GET /api/cases/{id}/guidance`) returns nine stages whose status is
+  derived from stored rows. On Operation Digital Trail it reported 7 evidence / 7 parsed /
+  0 needing attention / 20 events / 34 entities / 7 open findings / 202 unreviewed
+  relationships, with next action "202 relationships have not been reviewed".
+- **Event review** persisted a decision, wrote an `event.reviewed` audit row, and updated the
+  timeline `event_meta.review_status` plus the guidance counter (1 of 20 reviewed).
+- **Narrative** produced 18 evidence-linked statements in chronological order with no
+  guilt or proof language.
+- **Timeline** returned 14 correlated groups, per-event finding/relationship metadata and the
+  server-side `start`/`end`/`evidence_id` filters.
+- **Graph** renders sentence labels (for example "Same identifier in both sources"), a simple
+  mode limited to entities with documented connections, and a "why connected" panel showing
+  supporting evidence, locators and record snippets.
+- **Intake** returns `warning_details` for each parser warning (for example a call record with
+  no timestamp yields category `timestamp`, an impact note, a recommendation and `can_use=true`).
+- **Findings** include `classification`, `related_entities` and `timeline_refs`; the drawer
+  links each entity and timeline reference back to its source.
+- **Reports** add parsing summary, entity summary, conflicting records, unresolved questions
+  and a conclusion alongside the existing sections.
+- **AI** exposes `/ai/suggestions` derived from stored state and returns additive structured
+  keys (`classification`, `observed`, `supporting_evidence`, `why_it_matters`,
+  `confidence_limitations`, `recommended_next_action`).
+
+Automated checks: 142 backend tests and 23 frontend tests pass; frontend lint and production
+build are clean.

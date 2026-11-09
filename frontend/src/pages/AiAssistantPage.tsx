@@ -9,7 +9,12 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
-import { useAiStatus, useAskAi, useCreateAnnotation } from "@/hooks/useApi";
+import {
+  useAiStatus,
+  useAiSuggestions,
+  useAskAi,
+  useCreateAnnotation,
+} from "@/hooks/useApi";
 import { useToast } from "@/components/ui/Toast";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -33,6 +38,61 @@ const SUGGESTIONS = [
   "Summarize the investigation and separate observations from hypotheses.",
 ];
 
+function StructuredAnswer({ answer, caseId }: { answer: AiAnswer; caseId: string }) {
+  const sections: { label: string; body?: string }[] = [
+    { label: "What the records show", body: answer.observed },
+    { label: "Why it matters", body: answer.why_it_matters },
+    { label: "Confidence and limitations", body: answer.confidence_limitations },
+    { label: "Recommended next action", body: answer.recommended_next_action },
+  ].filter((section) => Boolean(section.body));
+
+  if (sections.length === 0 && !answer.supporting_evidence?.length) return null;
+
+  return (
+    <div className="mt-3 space-y-2.5">
+      {sections.map((section) => (
+        <div key={section.label}>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+            {section.label}
+          </p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-secondary">{section.body}</p>
+        </div>
+      ))}
+
+      {answer.supporting_evidence?.length ? (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+            Supporting evidence
+          </p>
+          <ul className="mt-1 space-y-1 text-[11px] leading-relaxed text-secondary">
+            {answer.supporting_evidence.map((item, index) => (
+              <li key={`${item.kind}-${item.id}-${index}`}>
+                <Link
+                  to={recordHref(item.kind, item.id, caseId)}
+                  className="font-mono text-[10px] text-accent hover:text-accent-strong"
+                >
+                  {item.kind}:{item.id.slice(0, 10)}
+                </Link>
+                {item.reason ? <span className="text-muted"> — {item.reason}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function recordHref(kind: string, id: string, caseId: string): string {
+  if (kind === "event") return `/cases/${caseId}/timeline?event=${encodeURIComponent(id)}`;
+  if (kind === "evidence") return `/cases/${caseId}/evidence?evidenceId=${encodeURIComponent(id)}`;
+  if (kind === "finding") return `/cases/${caseId}/findings?finding=${encodeURIComponent(id)}`;
+  if (kind === "relationship") {
+    return `/cases/${caseId}/graph?focusType=relationship&focusId=${encodeURIComponent(id)}`;
+  }
+  return `/cases/${caseId}`;
+}
+
 function citationHref(citation: AiAnswer["citations"][number], caseId: string): string | null {
   if (citation.event_id) return `/cases/${caseId}/timeline?event=${encodeURIComponent(citation.event_id)}`;
   if (citation.evidence_id) return `/cases/${caseId}/evidence?evidenceId=${encodeURIComponent(citation.evidence_id)}`;
@@ -50,6 +110,7 @@ export function AiAssistantPage() {
   const focusId = searchParams.get("focusId");
   const toast = useToast();
   const statusQuery = useAiStatus();
+  const suggestionsQuery = useAiSuggestions(caseId);
   const askAi = useAskAi(caseId ?? "");
   const createAnnotation = useCreateAnnotation(caseId ?? "");
   const transcriptKey = caseId ? `red-thread.ai.transcript.${caseId}` : "";
@@ -125,6 +186,9 @@ export function AiAssistantPage() {
     return <ErrorState message={statusQuery.error.message} onRetry={() => statusQuery.refetch()} />;
 
   const status = statusQuery.data;
+  const suggestions = suggestionsQuery.data?.items?.length
+    ? suggestionsQuery.data.items
+    : SUGGESTIONS.map((item) => ({ question: item, reason: "" }));
 
   async function send() {
     const trimmed = question.trim();
@@ -279,14 +343,20 @@ TOKENHARBOR_MODEL=deepseek-v4.1-flash:free`}
               icon={Bot}
               action={
                 <div className="flex max-w-2xl flex-wrap justify-center gap-2">
-                  {SUGGESTIONS.map((suggestion) => (
+                  {suggestions.map((suggestion) => (
                     <button
-                      key={suggestion}
+                      key={suggestion.question}
                       type="button"
-                      onClick={() => setQuestion(suggestion)}
+                      onClick={() => setQuestion(suggestion.question)}
                       className="rounded-lg border border-line-strong bg-surface/60 px-3 py-2 text-left text-[11px] text-secondary hover:border-accent/30 hover:text-accent"
+                      title={suggestion.reason || undefined}
                     >
-                      {suggestion}
+                      {suggestion.question}
+                      {suggestion.reason ? (
+                        <span className="mt-0.5 block text-[10px] text-muted">
+                          {suggestion.reason}
+                        </span>
+                      ) : null}
                     </button>
                   ))}
                 </div>
@@ -323,8 +393,17 @@ TOKENHARBOR_MODEL=deepseek-v4.1-flash:free`}
                         {message.answer.model_label ?? message.answer.model}
                       </span>
                     ) : null}
+                    {message.answer?.classification ? (
+                      <Badge className="border-line-strong bg-surface-2/70 capitalize text-muted">
+                        {message.answer.classification}
+                      </Badge>
+                    ) : null}
                   </div>
                   <p className="whitespace-pre-line text-sm leading-relaxed">{message.content}</p>
+
+                  {message.answer ? (
+                    <StructuredAnswer answer={message.answer} caseId={caseId} />
+                  ) : null}
 
                   {message.answer?.insufficient_evidence ? (
                     <p className="mt-3 rounded-lg border border-amber-200 dark:border-amber-500/20 bg-amber-50/80 dark:bg-amber-500/5 p-2 text-[11px] text-amber-800/80 dark:text-amber-100/80">

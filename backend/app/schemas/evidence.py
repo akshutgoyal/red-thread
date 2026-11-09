@@ -43,3 +43,6 @@ class ParseResponse(BaseModel):
     warnings: list[str]
     summary: dict[str, Any]
     status: str
+    warning_details: list[dict[str, Any]] = []
+    records_extracted: int | None = None
+    records_rejected: int | None = None

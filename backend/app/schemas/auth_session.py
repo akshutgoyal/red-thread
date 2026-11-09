@@ -16,5 +16,12 @@ class AuthUserRead(BaseModel):
 
 
 class AuthResponse(BaseModel):
-    token: str
+    """Login response.
+
+    ``token`` is intentionally omitted: the session lives in an HttpOnly cookie
+    so page scripts and XSS payloads cannot read it. The field remains optional
+    so older clients that read it do not crash.
+    """
+
+    token: str | None = None
     user: AuthUserRead

@@ -6,6 +6,7 @@ import {
   GitBranch,
   LayoutDashboard,
   ListChecks,
+  ListFilter,
   Map,
   ScrollText,
   Search,
@@ -33,6 +34,7 @@ const caseItems = [
   { suffix: "/evidence/intake", label: "Evidence intake", icon: UploadCloud },
   { suffix: "/entities", label: "Entity explorer", icon: Search },
   { suffix: "/graph", label: "Relationship graph", icon: GitBranch },
+  { suffix: "/events", label: "Extracted events", icon: ListFilter },
   { suffix: "/timeline", label: "Timeline", icon: ScrollText },
   { suffix: "/spatial", label: "Spatial reconstruction", icon: Map },
   { suffix: "/auth", label: "Auth analysis", icon: ShieldCheck },
@@ -42,7 +44,13 @@ const caseItems = [
   { suffix: "/reports", label: "Reports", icon: FileSearch },
 ];
 
-export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+export function Sidebar({
+  onNavigate,
+  onStartWalkthrough,
+}: {
+  onNavigate?: () => void;
+  onStartWalkthrough?: () => void;
+}) {
   const { cases, selectedCaseId, selectedCase, setSelectedCaseId } =
     useCaseContext();
   const { user, loginDemo, logout } = useAuth();
@@ -155,6 +163,18 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           </div>
           {user?.is_demo ? <Badge>Demo</Badge> : null}
         </div>
+        {onStartWalkthrough ? (
+          <button
+            type="button"
+            className="mt-2 w-full rounded-lg border border-accent/30 bg-accent/10 px-2 py-1.5 text-[10px] font-medium text-accent transition-colors hover:bg-accent/15"
+            onClick={() => {
+              onStartWalkthrough();
+              onNavigate?.();
+            }}
+          >
+            Restart guided walkthrough
+          </button>
+        ) : null}
         <div className="mt-2 flex gap-2">
           {user?.is_demo ? (
             <button

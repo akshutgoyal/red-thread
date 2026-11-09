@@ -18,9 +18,14 @@ import {
   useCase,
   useEvidence,
   useFindings,
+  useGuidance,
+  useNarrative,
   useReconcile,
   useUpdateCase,
 } from "@/hooks/useApi";
+import { NextActionPanel, useSessionDismiss } from "@/components/guidance/GuidancePanels";
+import { WorkflowTracker } from "@/components/guidance/WorkflowTracker";
+import { CaseNarrative } from "@/components/narrative/CaseNarrative";
 import { useToast } from "@/components/ui/Toast";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -43,6 +48,11 @@ export function CaseOverviewPage() {
   const auditQuery = useAudit(caseId);
   const updateCase = useUpdateCase(caseId ?? "");
   const reconcile = useReconcile(caseId ?? "");
+  const guidanceQuery = useGuidance(caseId);
+  const narrativeQuery = useNarrative(caseId);
+  const { dismissed, dismiss } = useSessionDismiss(
+    `red-thread.next-action.dismissed.${caseId ?? "none"}`,
+  );
 
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState("open");
@@ -116,6 +126,12 @@ export function CaseOverviewPage() {
         }
       />
 
+      {guidanceQuery.data && !dismissed ? (
+        <div className="mb-4">
+          <NextActionPanel guidance={guidanceQuery.data} onDismiss={dismiss} />
+        </div>
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Evidence" value={evidence.length} icon={FileSearch} tone="cyan" />
         <StatCard label="Events" value={currentCase.event_count} icon={Activity} tone="violet" />
@@ -134,6 +150,18 @@ export function CaseOverviewPage() {
           tone="emerald"
         />
       </div>
+
+      {guidanceQuery.data ? (
+        <div className="mt-5 grid gap-5 xl:grid-cols-2">
+          <WorkflowTracker guidance={guidanceQuery.data} />
+          <CaseNarrative
+            caseId={caseId}
+            narrative={narrativeQuery.data}
+            loading={narrativeQuery.isLoading}
+            limit={4}
+          />
+        </div>
+      ) : null}
 
       <div className="mt-5 grid gap-5 xl:grid-cols-3">
         <Card className="xl:col-span-2">

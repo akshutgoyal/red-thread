@@ -11,6 +11,7 @@ from ..config import get_settings
 from ..models import Event, Evidence, Finding, FindingEvidence
 from ..parsers.base import CanonicalEventDraft, ParserContext, ParseResult
 from ..parsers.registry import SUPPORTED_DESCRIPTION, detect_parser
+from ..utils.warning_guidance import describe_warnings
 from . import audit_service, entity_service, evidence_service, reconciliation_service
 
 MAX_PARSER_WARNINGS = 50
@@ -33,6 +34,8 @@ def _parser_context(evidence: Evidence, parser_name: str) -> ParserContext:
         if parser_name == "auth_log"
         else settings.default_timezone
     )
+    stored_mapping = (evidence.metadata_json or {}).get("column_mapping")
+    mapping = stored_mapping if isinstance(stored_mapping, dict) and stored_mapping else None
     return ParserContext(
         case_id=evidence.case_id,
         evidence_id=evidence.id,
@@ -40,6 +43,7 @@ def _parser_context(evidence: Evidence, parser_name: str) -> ParserContext:
         reference_date=evidence.uploaded_at or datetime.now(timezone.utc),
         default_year=settings.auth_default_year if parser_name == "auth_log" else None,
         timezone=timezone,
+        column_mapping={str(k): str(v) for k, v in mapping.items()} if mapping else None,
     )
 
 
@@ -192,6 +196,24 @@ def _persist_auth_alerts(
     return created
 
 
+def _records_extracted(result: ParseResult, events: list[Event]) -> int:
+    metadata = result.metadata or {}
+    for key in ("records_total", "rows_total", "records", "row_count"):
+        value = metadata.get(key)
+        if isinstance(value, int):
+            return value
+    return len(events)
+
+
+def _records_rejected(result: ParseResult) -> int:
+    metadata = result.metadata or {}
+    for key in ("records_rejected", "rows_rejected", "skipped_rows", "invalid_rows"):
+        value = metadata.get(key)
+        if isinstance(value, int):
+            return value
+    return 0
+
+
 def _status_for(result: ParseResult, events: list[Event]) -> tuple[str, str | None]:
     if result.parser_name == "image" and result.metadata.get("ocr_available") is False:
         return (
@@ -265,11 +287,19 @@ def parse_evidence(
     evidence.parser_version = result.parser_version
     evidence.processing_status = processing_status
     evidence.processing_error = processing_error
+    warning_details = describe_warnings(
+        warning_messages(result.warnings), source_locator=evidence.original_filename
+    )
+    records_extracted = _records_extracted(result, events)
+    records_rejected = _records_rejected(result)
     evidence.metadata_json = {
         **result.metadata,
         "warnings": warning_messages(result.warnings),
+        "warning_details": warning_details,
         "events_created": len(events),
         "findings_created": len(auth_findings) + len(reconciliation_findings),
+        "records_extracted": records_extracted,
+        "records_rejected": records_rejected,
     }
 
     audit_service.record(
@@ -296,11 +326,16 @@ def parse_evidence(
         "events_created": len(events),
         "findings_created": len(auth_findings) + len(reconciliation_findings),
         "warnings": warning_messages(result.warnings),
+        "warning_details": warning_details,
+        "records_extracted": records_extracted,
+        "records_rejected": records_rejected,
         "summary": {
             "parser_metadata": result.metadata,
             "events_created": len(events),
             "auth_findings": len(auth_findings),
             "reconciliation_findings": len(reconciliation_findings),
+            "records_extracted": records_extracted,
+            "records_rejected": records_rejected,
         },
         "status": processing_status,
     }

@@ -16,6 +16,7 @@ import {
   useVerifyEvidence,
 } from "@/hooks/useApi";
 import { api } from "@/api/client";
+import { ColumnMappingPanel } from "@/components/evidence/ColumnMappingPanel";
 import { useToast } from "@/components/ui/Toast";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -402,6 +403,8 @@ function EvidenceDetail({
           </p>
         ) : null}
       </div>
+
+      <ColumnMappingPanel caseId={caseId} evidence={evidence} />
 
       <div>
         <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted">
