@@ -5,17 +5,19 @@ import { TopBar } from "./TopBar";
 import { NextActionStrip } from "@/components/guidance/NextActionStrip";
 import { WalkthroughOverlay, useWalkthrough } from "@/components/guidance/Walkthrough";
 import { useAuth } from "@/context/AuthContext";
+import { useCaseContext } from "@/context/CaseContext";
 
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user } = useAuth();
+  const { selectedCaseId } = useCaseContext();
   const walkthrough = useWalkthrough(Boolean(user?.is_demo));
 
   return (
     <div className="flex h-screen overflow-hidden bg-app text-primary">
       <div className="pointer-events-none fixed inset-0 app-aurora" />
       <div className="relative hidden h-screen shrink-0 lg:block">
-        <Sidebar onStartWalkthrough={user?.is_demo ? walkthrough.restart : undefined} />
+        <Sidebar onStartWalkthrough={user?.is_demo ? () => walkthrough.restart(selectedCaseId) : undefined} />
       </div>
 
       {mobileOpen ? (
@@ -28,7 +30,7 @@ export function AppShell() {
           <div className="relative">
             <Sidebar
               onNavigate={() => setMobileOpen(false)}
-              onStartWalkthrough={user?.is_demo ? walkthrough.restart : undefined}
+              onStartWalkthrough={user?.is_demo ? () => walkthrough.restart(selectedCaseId) : undefined}
             />
           </div>
         </div>
@@ -54,6 +56,7 @@ export function AppShell() {
           onClose={walkthrough.close}
           step={walkthrough.step}
           onStepChange={walkthrough.setStep}
+          caseId={selectedCaseId}
         />
       ) : null}
     </div>
