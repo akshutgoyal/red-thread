@@ -35,4 +35,32 @@ describe("LoginPage", () => {
     await waitFor(() => expect(auth.useAuth().loginDemo).toHaveBeenCalledTimes(1));
   });
 
+  it("initializes Google sign-in after the loading state clears", async () => {
+    // Regression: the effect used to run while the loading state was rendered,
+    // so the button container did not exist yet and the effect never re-ran.
+    const renderButton = vi.fn();
+    const initialize = vi.fn();
+    (window as unknown as { google: unknown }).google = {
+      accounts: { id: { initialize, renderButton } },
+    };
+
+    auth.useAuth.mockReturnValue({
+      user: null,
+      isLoading: false,
+      loginGoogle: vi.fn(),
+      loginDemo: vi.fn(),
+      logout: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(initialize).toHaveBeenCalled());
+    expect(renderButton).toHaveBeenCalled();
+
+    delete (window as unknown as { google?: unknown }).google;
+  });
 });

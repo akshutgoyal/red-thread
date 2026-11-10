@@ -79,7 +79,7 @@ export function LoginPage() {
       cancelled = true;
       script.removeEventListener("load", initializeGoogle);
     };
-  }, [loginGoogle, navigate, user]);
+  }, [loginGoogle, navigate, user, isLoading]);
 
   async function handleDemo() {
     setBusy(true);
