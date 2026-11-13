@@ -98,9 +98,62 @@ export function LoginPage() {
   if (user) return <Navigate to="/" replace />;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-app px-4 py-10 text-primary">
+    <div className="relative min-h-screen overflow-hidden bg-app text-primary">
       <div className="pointer-events-none fixed inset-0 app-aurora" />
-      <Card className="relative w-full max-w-md overflow-hidden">
+      <div className="pointer-events-none fixed inset-0 hud-grid opacity-[0.35]" />
+
+      <div className="relative mx-auto grid min-h-screen w-full max-w-[1240px] items-center gap-10 px-5 py-10 lg:grid-cols-[1.05fr_minmax(0,430px)] lg:gap-16 lg:px-8">
+        <section className="order-2 hidden lg:order-1 lg:block">
+          <p className="inline-flex items-center gap-2 rounded-full border border-line bg-surface-2/70 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent-fill" />
+            Digital forensics framework
+          </p>
+          <h1 className="mt-6 max-w-xl text-4xl font-semibold leading-[1.15] tracking-tight xl:text-5xl">
+            Every Evidence Has a Connection.
+            <span className="mt-2 block text-accent">Find the Missing Thread.</span>
+          </h1>
+          <p className="mt-5 max-w-lg text-sm leading-relaxed text-secondary">
+            An intelligent digital forensics framework that transforms fragmented digital
+            evidence into connected, traceable and explainable investigations.
+          </p>
+
+          <ul className="mt-9 grid max-w-xl gap-3 sm:grid-cols-2">
+            {[
+              {
+                title: "Evidence integrity",
+                body: "Every file is hashed with SHA-256 at intake and re-verifiable later.",
+              },
+              {
+                title: "Multi-source analysis",
+                body: "Calls, chats, email, device, auth, GPS and CCTV in one timeline.",
+              },
+              {
+                title: "Relationship visualization",
+                body: "Provenance-backed connections, labelled separately from leads.",
+              },
+              {
+                title: "Evidence-grounded AI",
+                body: "Answers cite stored records, or state that evidence is insufficient.",
+              },
+            ].map((item) => (
+              <li
+                key={item.title}
+                className="rounded-xl border border-line bg-surface/60 px-4 py-3 backdrop-blur-sm"
+              >
+                <p className="text-xs font-semibold text-primary">{item.title}</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted">{item.body}</p>
+              </li>
+            ))}
+          </ul>
+
+          <p className="mt-8 max-w-xl text-[10px] leading-relaxed text-muted">
+            Findings are investigative leads for human review. Red Thread does not
+            determine guilt, and no relationship in the graph proves criminal activity.
+          </p>
+        </section>
+
+        <Card className="order-1 w-full overflow-hidden lg:order-2">
+          <div className="card-sheen">
         <CardBody className="p-8 sm:p-10">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 text-accent">
@@ -155,7 +208,9 @@ export function LoginPage() {
             require human review.
           </p>
         </CardBody>
+          </div>
       </Card>
+      </div>
     </div>
   );
 }

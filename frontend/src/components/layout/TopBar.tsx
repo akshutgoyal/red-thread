@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Menu, Plus } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useCaseContext } from "@/context/CaseContext";
@@ -21,7 +22,7 @@ function routeTitle(pathname: string): string {
   return "Case overview";
 }
 
-export function TopBar({ onMenu }: { onMenu: () => void }) {
+export function TopBar({ onMenu, help }: { onMenu: () => void; help?: ReactNode }) {
   const location = useLocation();
   const { selectedCase } = useCaseContext();
   const { data: aiStatus } = useAiStatus();
@@ -67,6 +68,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
         >
           {aiStatus?.configured ? aiStatus.model_label ?? aiStatus.model : "AI disabled"}
         </Badge>
+        {help}
         <ThemeToggle />
         <Link to="/cases" className="hidden sm:block">
           <Button size="sm" variant="primary" icon={<Plus size={14} />}>

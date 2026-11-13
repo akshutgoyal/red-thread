@@ -194,11 +194,11 @@ export function DashboardPage() {
       ) : guidance ? (
         <>
           {dismissed ? null : (
-            <div className="mb-4">
+            <div className="mb-4" data-tour="next-action">
               <NextActionPanel guidance={guidance} onDismiss={dismiss} />
             </div>
           )}
-          <Card className="mb-4">
+          <Card className="mb-4" data-tour="workflow-progress">
             <CardHeader
               title="Investigation progress"
               subtitle={`${progress.completed} of ${progress.total} stages complete`}
@@ -283,7 +283,7 @@ export function DashboardPage() {
         </div>
       ) : null}
 
-      <div className="mb-4">
+      <div className="mb-4" data-tour="narrative">
         <CaseNarrative
           caseId={selectedCaseId}
           narrative={narrativeQuery.data}

@@ -26,12 +26,17 @@ import { ReportsPage } from "@/pages/ReportsPage";
 import { EntityExplorerPage } from "@/pages/EntityExplorerPage";
 import { SpatialPage } from "@/pages/SpatialPage";
 import { ReconstructionPage } from "@/pages/ReconstructionPage";
+import { TourProvider } from "@/components/tour/TourProvider";
+import { TOURS } from "@/components/tour/tours";
 
 function AuthenticatedLayout() {
   const { user } = useAuth();
   return (
     <CaseProvider key={user?.id ?? "anonymous"}>
-      <AppShell />
+      {/* The tour engine lives inside the router so it can navigate steps. */}
+      <TourProvider tours={TOURS}>
+        <AppShell />
+      </TourProvider>
     </CaseProvider>
   );
 }

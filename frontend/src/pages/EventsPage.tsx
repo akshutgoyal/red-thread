@@ -171,7 +171,7 @@ export function EventsPage() {
             </span>
           }
         />
-        <CardBody className="space-y-2">
+        <CardBody className="space-y-2" data-tour="events-list">
           {events.length === 0 ? (
             <EmptyState
               title="No events match"

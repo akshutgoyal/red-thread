@@ -157,6 +157,7 @@ export function EvidenceVaultPage() {
             />
           </CardBody>
         ) : (
+          <div data-tour="evidence-table">
           <Table>
             <THead>
               <TR>
@@ -240,6 +241,7 @@ export function EvidenceVaultPage() {
               ))}
             </TBody>
           </Table>
+          </div>
         )}
       </Card>
 
@@ -251,6 +253,7 @@ export function EvidenceVaultPage() {
         wide
       >
         {selected ? (
+          <div data-tour="evidence-detail">
           <EvidenceDetail
             evidence={selected}
             caseId={caseId}
@@ -275,6 +278,7 @@ export function EvidenceVaultPage() {
             }
             onCopyHash={() => void copyHash(selected.sha256)}
           />
+          </div>
         ) : null}
       </Drawer>
     </div>

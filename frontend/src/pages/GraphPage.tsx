@@ -18,7 +18,6 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
 import { Input, Select } from "@/components/ui/Field";
 import { SegmentedControl } from "@/components/ui/Primitives";
 import { RelationshipEvidencePanel } from "@/components/relationship/RelationshipEvidencePanel";
-import { cn } from "@/lib/cn";
 import { formatDateTime, humanize } from "@/lib/format";
 import { useTheme } from "@/theme/ThemeContext";
 import type { GraphEdge, GraphNode } from "@/types";
@@ -73,6 +72,61 @@ const NODE_COLORS_DARK: Record<string, string> = {
   default: "#f59e0b",
 };
 
+
+/**
+ * Node icons.
+ *
+ * Cytoscape can only paint images, so each icon is an inline SVG data URI.
+ * White strokes read on every category colour, and the same glyphs are reused
+ * in the legend and the connections list.
+ */
+function svgIcon(path: string, size = 16): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="white" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+const ICON_PATHS: Record<string, string> = {
+  person: '<circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.4 3.1-5.4 7-5.4s7 2 7 5.4"/>',
+  phone: '<path d="M7 3h3l2 5-2.5 1.5a12 12 0 0 0 5 5L16 12l5 2v3a2 2 0 0 1-2.2 2A17 17 0 0 1 4 6.2 2 2 0 0 1 6 4z"/>',
+  device: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16v4"/>',
+  ip: '<circle cx="12" cy="12" r="8"/><path d="M4 12h16"/><path d="M12 4c2.5 2.2 3.6 5 3.6 8s-1.1 5.8-3.6 8c-2.5-2.2-3.6-5-3.6-8S9.5 6.2 12 4z"/>',
+  account: '<circle cx="12" cy="8" r="3"/><path d="M5.5 20c0-3.2 2.9-5 6.5-5s6.5 1.8 6.5 5"/>',
+  transaction: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h3"/>',
+  money: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/>',
+  email: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6.5 8.5 6 8.5-6"/>',
+  location: '<path d="M12 21s6.5-5.6 6.5-10.4A6.5 6.5 0 0 0 5.5 10.6C5.5 15.4 12 21 12 21z"/><circle cx="12" cy="10.4" r="2.3"/>',
+  evidence: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+  event: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4.2l2.6 1.6"/>',
+  tower: '<path d="M12 4v16"/><path d="M8 7 12 4l4 3"/><path d="M6 20h12"/>',
+  default: '<circle cx="12" cy="12" r="4"/>',
+};
+
+const CATEGORY_ICONS: Record<string, string> = {
+  person: "person",
+  phone: "phone",
+  device: "device",
+  ip: "ip",
+  username: "account",
+  account: "account",
+  session: "account",
+  transaction: "transaction",
+  transaction_id: "transaction",
+  upi_vpa: "money",
+  amount: "money",
+  email: "email",
+  person_email: "email",
+  location: "location",
+  cell_tower: "tower",
+  evidence: "evidence",
+  file: "evidence",
+  filename: "evidence",
+  event: "event",
+};
+
+function iconFor(category: string): string {
+  return svgIcon(ICON_PATHS[CATEGORY_ICONS[category] ?? "default"]);
+}
+
 const NODE_LABELS: Record<string, string> = {
   evidence: "Evidence file",
   event: "Extracted event",
@@ -118,22 +172,30 @@ const NODE_SHAPES: Record<string, string> = {
 
 const GRAPH_PALETTES = {
   light: {
-    label: "#334155",
+    label: "#3b4553",
+    labelBg: "#ffffff",
     border: "#ffffff",
-    edge: "#94a3b8",
-    edgeLabel: "#475569",
-    exact: "#059669",
-    conflict: "#e11d48",
-    heuristic: "#d97706",
+    nodeBorder: "#ffffff",
+    edge: "#a8b0bd",
+    edgeLabel: "#55606f",
+    edgeLabelBg: "#ffffff",
+    exact: "#14855f",
+    conflict: "#d93645",
+    heuristic: "#b7791f",
+    selection: "#c4283a",
   },
   dark: {
-    label: "#cbd5e1",
-    border: "#0f172a",
-    edge: "#475569",
-    edgeLabel: "#94a3b8",
-    exact: "#34d399",
-    conflict: "#fb7185",
-    heuristic: "#fbbf24",
+    label: "#c7cdd6",
+    labelBg: "#0b0e14",
+    border: "#0b0e14",
+    nodeBorder: "#0b0e14",
+    edge: "#3b4658",
+    edgeLabel: "#9ca3af",
+    edgeLabelBg: "#11151d",
+    exact: "#3ecf9a",
+    conflict: "#f06470",
+    heuristic: "#e3bb5a",
+    selection: "#f06470",
   },
 };
 
@@ -269,6 +331,7 @@ export function GraphPage() {
             category,
             shape: NODE_SHAPES[category] ?? "ellipse",
             color: nodeColors[category] ?? nodeColors.default,
+            icon: iconFor(category),
             type_label: NODE_LABELS[category] ?? humanize(category),
           },
         };
@@ -366,6 +429,7 @@ export function GraphPage() {
         description="Each line explains a documented connection. Colours and shapes identify the type of entity; heuristics are drawn dashed and are leads, not proof."
         actions={
           <>
+            <div data-tour="graph-mode">
             <SegmentedControl
               label="Graph mode"
               value={mode}
@@ -375,6 +439,7 @@ export function GraphPage() {
                 { value: "advanced", label: "Advanced" },
               ]}
             />
+            </div>
             <div className="relative">
               <Search
                 size={13}
@@ -442,7 +507,7 @@ export function GraphPage() {
               </div>
             }
           />
-          <CardBody className="p-0">
+          <CardBody className="p-0" data-tour="graph-canvas">
             {visibleElements.length === 0 ? (
               <div className="p-6">
                 <EmptyState
@@ -474,7 +539,7 @@ export function GraphPage() {
         </Card>
 
         <div className="space-y-4">
-          <Card>
+          <Card data-tour="graph-filters">
             <CardHeader title="Filters" subtitle="Narrow the graph to what matters" />
             <CardBody className="space-y-3 text-[11px] text-muted">
               <label className="block">
@@ -527,7 +592,7 @@ export function GraphPage() {
             </CardBody>
           </Card>
 
-          <Card>
+          <Card data-tour="graph-connections-list">
             <CardHeader
               title="Connections list"
               subtitle="Keyboard-accessible alternative to the canvas"
@@ -578,17 +643,17 @@ export function GraphPage() {
             </CardBody>
           </Card>
 
-          <Card>
+          <Card data-tour="graph-legend">
             <CardHeader title="Legend" subtitle="Shape and colour identify entity types" />
             <CardBody className="space-y-2 text-[11px] text-muted">
-              <LegendShape color={nodeColors.evidence} label="Evidence file" shape="round-rectangle" />
-              <LegendShape color={nodeColors.event} label="Extracted event" shape="ellipse" />
-              <LegendShape color={nodeColors.phone} label="Phone number" shape="circle" />
-              <LegendShape color={nodeColors.device} label="Device" shape="round-rectangle" />
-              <LegendShape color={nodeColors.upi_vpa} label="UPI / account identifier" shape="diamond" />
-              <LegendShape color={nodeColors.ip} label="IP address" shape="hexagon" />
-              <LegendShape color={nodeColors.username} label="User account" shape="triangle" />
-              <LegendShape color={nodeColors.email} label="Email address" shape="ellipse" />
+              <LegendShape color={nodeColors.evidence} label="Evidence file" icon={iconFor("evidence")} />
+              <LegendShape color={nodeColors.phone} label="Phone number" icon={iconFor("phone")} />
+              <LegendShape color={nodeColors.device} label="Device" icon={iconFor("device")} />
+              <LegendShape color={nodeColors.upi_vpa} label="UPI / account identifier" icon={iconFor("upi_vpa")} />
+              <LegendShape color={nodeColors.ip} label="IP address" icon={iconFor("ip")} />
+              <LegendShape color={nodeColors.username} label="User account" icon={iconFor("username")} />
+              <LegendShape color={nodeColors.email} label="Email address" icon={iconFor("email")} />
+              <LegendShape color={nodeColors.default} label="Other entity" icon={iconFor("default")} />
               <div className="my-2 h-px bg-surface-2" />
               <LegendLine color={palette.exact} label="Exact identifier / documented" />
               <LegendLine color={palette.conflict} label="Conflict or discrepancy" />
@@ -597,7 +662,7 @@ export function GraphPage() {
             </CardBody>
           </Card>
 
-          <Card>
+          <Card data-tour="graph-selection">
             <CardHeader title="Selection" subtitle="Click a node or a line to understand it" />
             <CardBody>
               {!selected && focusType === "relationship" && focusId ? (
@@ -873,30 +938,61 @@ function LegendLine({
 function LegendShape({
   color,
   label,
-  shape,
+  icon,
 }: {
   color: string;
   label: string;
-  shape: string;
+  icon: string;
 }) {
-  const radius =
-    shape === "circle" || shape === "ellipse"
-      ? "9999px"
-      : shape === "triangle"
-        ? "0"
-        : shape === "diamond"
-          ? "2px"
-          : "3px";
-  const rotate = shape === "diamond" ? "rotate-45" : "";
   return (
     <div className="flex items-center gap-2">
       <span
-        className={cn("block h-3 w-3", rotate)}
-        style={{ backgroundColor: color, borderRadius: radius }}
-      />
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px]"
+        style={{ backgroundColor: color }}
+        aria-hidden="true"
+      >
+        <img src={icon} alt="" className="h-3 w-3" />
+      </span>
       <span>{label}</span>
     </div>
   );
+}
+
+/**
+ * Layout options tuned for readability rather than compactness.
+ *
+ * Real investigations produce dense graphs, so nodes get generous separation
+ * and labels are placed to avoid sitting on top of each other.
+ */
+function layoutOptions(name: string): cytoscape.LayoutOptions {
+  if (name === "cose") {
+    return {
+      name: "cose",
+      animate: false,
+      fit: true,
+      padding: 44,
+      nodeRepulsion: () => 12000,
+      idealEdgeLength: () => 90,
+      edgeElasticity: () => 90,
+      gravity: 0.9,
+      numIter: 1200,
+      componentSpacing: 70,
+      nodeOverlap: 18,
+    } as cytoscape.LayoutOptions;
+  }
+  if (name === "breadthfirst") {
+    return {
+      name: "breadthfirst",
+      directed: true,
+      padding: 40,
+      spacingFactor: 1.35,
+      avoidOverlap: true,
+    } as cytoscape.LayoutOptions;
+  }
+  if (name === "circle") {
+    return { name: "circle", padding: 40, avoidOverlap: true } as cytoscape.LayoutOptions;
+  }
+  return { name: "grid", padding: 40, avoidOverlap: true } as cytoscape.LayoutOptions;
 }
 
 function CytoscapeCanvas({
@@ -928,17 +1024,30 @@ function CytoscapeCanvas({
           selector: "node",
           style: {
             "background-color": "data(color)",
+            "background-image": "data(icon)",
+            "background-fit": "none",
+            "background-width": 13,
+            "background-height": 13,
+            "background-position-x": "50%",
+            "background-position-y": "50%",
             label: "data(label)",
             color: palette.label,
             "font-size": 9,
+            "font-weight": 500,
             "text-valign": "bottom",
-            "text-margin-y": 4,
+            "text-halign": "center",
+            "text-margin-y": 6,
             "text-wrap": "ellipsis",
-            "text-max-width": "110px",
-            width: 22,
-            height: 22,
-            "border-width": 2,
-            "border-color": palette.border,
+            "text-max-width": "96px",
+            "text-background-color": palette.labelBg,
+            "text-background-opacity": 0.85,
+            "text-background-padding": "2px",
+            "text-background-shape": "roundrectangle",
+            width: 26,
+            height: 26,
+            "border-width": 1.5,
+            "border-color": palette.nodeBorder,
+            "overlay-opacity": 0,
           },
         },
         ...Object.entries(NODE_SHAPES).map(([category, shape]) => ({
@@ -947,27 +1056,43 @@ function CytoscapeCanvas({
         })),
         {
           selector: 'node[node_type = "evidence"]',
-          style: { width: 34, height: 24 },
+          style: {
+            width: 34,
+            height: 30,
+            "background-width": 15,
+            "background-height": 15,
+          },
         },
         {
           selector: "edge",
           style: {
-            width: 1.4,
+            width: 1.3,
             "line-color": palette.edge,
             "target-arrow-color": palette.edge,
             "target-arrow-shape": "triangle",
+            "arrow-scale": 0.7,
             "curve-style": "bezier",
-            opacity: 0.85,
+            "control-point-step-size": 44,
+            opacity: 0.75,
             label: simple ? "data(label)" : "",
             "font-size": 7,
+            "min-zoomed-font-size": 9,
             "text-rotation": "autorotate",
-            "text-background-color": palette.border,
-            "text-background-opacity": 0.85,
-            "text-background-padding": "2px",
+            "text-background-color": palette.edgeLabelBg,
+            "text-background-opacity": 0.92,
+            "text-background-padding": "3px",
+            "text-background-shape": "roundrectangle",
             color: palette.edgeLabel,
-            "text-max-width": "120px",
+            "text-max-width": "110px",
             "text-wrap": "ellipsis",
+            "text-overflow-wrap": "whitespace",
+            "overlay-opacity": 0,
           },
+        },
+        {
+          // Labels disappear before they can collide in a dense graph.
+          selector: "node[label]",
+          style: { "min-zoomed-font-size": 8 },
         },
         {
           selector: 'edge[relationship_type = "shared_identifier"]',
@@ -1031,14 +1156,24 @@ function CytoscapeCanvas({
         },
         {
           selector: "node:selected",
-          style: { "border-width": 3, "border-color": palette.exact },
+          style: {
+            "border-width": 3,
+            "border-color": palette.selection,
+            "underlay-color": palette.selection,
+            "underlay-opacity": 0.18,
+            "underlay-padding": 8,
+          },
         },
         {
           selector: "edge:selected",
-          style: { width: 3, opacity: 1 },
+          style: { width: 2.6, opacity: 1, "line-color": palette.selection, "target-arrow-color": palette.selection },
+        },
+        {
+          selector: ".tour-hover",
+          style: { "underlay-color": palette.selection, "underlay-opacity": 0.12, "underlay-padding": 6 },
         },
       ],
-      layout: { name: "cose", fit: true, padding: 40 },
+      layout: layoutOptions("cose"),
       minZoom: 0.2,
       maxZoom: 2.5,
     });
@@ -1077,7 +1212,7 @@ function CytoscapeCanvas({
     if (!cy) return;
     cy.elements().remove();
     cy.add(elements);
-    const layoutInstance = cy.layout({ name: layout });
+    const layoutInstance = cy.layout(layoutOptions(layout));
     layoutInstance.run();
     layoutInstance.one("layoutstop", () => cy.fit(undefined, 40));
   }, [elements, layout]);

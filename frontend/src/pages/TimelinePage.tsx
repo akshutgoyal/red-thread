@@ -166,6 +166,7 @@ export function TimelinePage() {
 
       <Card className="mb-4">
         <CardBody className="flex flex-wrap items-center gap-2">
+          <div data-tour="timeline-view">
           <SegmentedControl
             label="Timeline view"
             value={view}
@@ -176,6 +177,7 @@ export function TimelinePage() {
               { value: "suspicious", label: "Flagged" },
             ]}
           />
+          </div>
           <div className="relative">
             <Search size={13} className="absolute left-2.5 top-2.5 text-muted" />
             <Input
@@ -186,6 +188,7 @@ export function TimelinePage() {
               aria-label="Search events"
             />
           </div>
+          <div data-tour="timeline-filters" className="contents">
           <Select
             value={categoryFilter}
             onChange={(event) => setCategoryFilter(event.target.value)}
@@ -241,6 +244,7 @@ export function TimelinePage() {
             className="w-36 text-xs"
             aria-label="End date"
           />
+          </div>
         </CardBody>
       </Card>
 
@@ -253,7 +257,7 @@ export function TimelinePage() {
               : ""
           }${undated.length ? ` · ${undated.length} undated` : ""}`}
         />
-        <CardBody>
+        <CardBody data-tour="timeline-events">
           {filtered.length === 0 ? (
             <EmptyState
               title="No events match these filters"
@@ -354,7 +358,7 @@ export function TimelinePage() {
       </Card>
 
       {undated.length > 0 ? (
-        <Card className="mt-5 border-amber-200 dark:border-amber-500/20">
+        <Card className="mt-5 border-amber-200 dark:border-amber-500/20" data-tour="timeline-undated">
           <CardHeader
             title="Undated or uncertain events"
             subtitle="Preserved without forcing false chronological precision"

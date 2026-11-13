@@ -335,14 +335,17 @@ TOKENHARBOR_MODEL=deepseek-v4.1-flash:free`}
           title="Conversation"
           subtitle="AI output is an interpretation, not evidence. Validate every citation."
         />
-        <CardBody className="min-h-[420px] space-y-4">
+        <CardBody className="min-h-[420px] space-y-4" data-tour="ai-conversation">
           {messages.length === 0 ? (
             <EmptyState
               title="Ask a question about this case"
               description="The assistant retrieves relevant stored events, findings and evidence metadata. It is instructed not to invent identifiers or citations."
               icon={Bot}
               action={
-                <div className="flex max-w-2xl flex-wrap justify-center gap-2">
+                <div
+                  className="flex max-w-2xl flex-wrap justify-center gap-2"
+                  data-tour="ai-suggestions"
+                >
                   {suggestions.map((suggestion) => (
                     <button
                       key={suggestion.question}
@@ -526,7 +529,7 @@ TOKENHARBOR_MODEL=deepseek-v4.1-flash:free`}
           ) : null}
         </CardBody>
 
-        <div className="border-t border-line p-4">
+        <div className="border-t border-line p-4" data-tour="ai-composer">
           <div className="flex items-end gap-2">
             <textarea
               value={question}

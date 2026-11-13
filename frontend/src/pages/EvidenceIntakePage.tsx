@@ -222,6 +222,7 @@ export function EvidenceIntakePage() {
       <Card>
         <CardBody>
           <div
+            data-tour="evidence-dropzone"
             onDragOver={(event) => {
               event.preventDefault();
               setDragActive(true);
@@ -367,7 +368,10 @@ export function EvidenceIntakePage() {
                   </div>
                 </div>
 
-                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                <div
+                  className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5"
+                  data-tour="evidence-pipeline"
+                >
                   {fileStages(result).map((stage, stageIndex) => (
                     <span
                       key={stage.label}
@@ -423,7 +427,7 @@ export function EvidenceIntakePage() {
                 ) : null}
 
                 {(result.parse?.warning_details?.length ?? 0) > 0 ? (
-                  <ul className="mt-2.5 space-y-2">
+                  <ul className="mt-2.5 space-y-2" data-tour="warning-panel">
                     {(result.parse?.warning_details ?? []).map((detail, detailIndex) => (
                       <WarningItem
                         key={`${result.filename}-w-${detailIndex}`}

@@ -127,7 +127,7 @@ export function CaseOverviewPage() {
       />
 
       {guidanceQuery.data && !dismissed ? (
-        <div className="mb-4">
+        <div className="mb-4" data-tour="next-action">
           <NextActionPanel guidance={guidanceQuery.data} onDismiss={dismiss} />
         </div>
       ) : null}
@@ -153,13 +153,17 @@ export function CaseOverviewPage() {
 
       {guidanceQuery.data ? (
         <div className="mt-5 grid gap-5 xl:grid-cols-2">
-          <WorkflowTracker guidance={guidanceQuery.data} />
-          <CaseNarrative
-            caseId={caseId}
-            narrative={narrativeQuery.data}
-            loading={narrativeQuery.isLoading}
-            limit={4}
-          />
+          <div data-tour="workflow-progress" className="contents">
+            <WorkflowTracker guidance={guidanceQuery.data} />
+          </div>
+          <div data-tour="narrative" className="contents">
+            <CaseNarrative
+              caseId={caseId}
+              narrative={narrativeQuery.data}
+              loading={narrativeQuery.isLoading}
+              limit={4}
+            />
+          </div>
         </div>
       ) : null}
 

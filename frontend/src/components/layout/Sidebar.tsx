@@ -44,13 +44,7 @@ const caseItems = [
   { suffix: "/reports", label: "Reports", icon: FileSearch },
 ];
 
-export function Sidebar({
-  onNavigate,
-  onStartWalkthrough,
-}: {
-  onNavigate?: () => void;
-  onStartWalkthrough?: () => void;
-}) {
+export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { cases, selectedCaseId, selectedCase, setSelectedCaseId } =
     useCaseContext();
   const { user, loginDemo, logout } = useAuth();
@@ -97,6 +91,7 @@ export function Sidebar({
           Active case
         </label>
         <select
+          data-tour="case-selector"
           value={selectedCaseId ?? ""}
           onChange={(event) => handleCaseChange(event.target.value)}
           className="w-full cursor-pointer rounded-lg border border-line-strong bg-surface-2 px-3 py-2 text-xs text-primary transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
@@ -163,18 +158,6 @@ export function Sidebar({
           </div>
           {user?.is_demo ? <Badge>Demo</Badge> : null}
         </div>
-        {onStartWalkthrough ? (
-          <button
-            type="button"
-            className="mt-2 w-full rounded-lg border border-accent/30 bg-accent/10 px-2 py-1.5 text-[10px] font-medium text-accent transition-colors hover:bg-accent/15"
-            onClick={() => {
-              onStartWalkthrough();
-              onNavigate?.();
-            }}
-          >
-            Restart guided walkthrough
-          </button>
-        ) : null}
         <div className="mt-2 flex gap-2">
           {user?.is_demo ? (
             <button
