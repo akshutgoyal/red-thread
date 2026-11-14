@@ -156,7 +156,7 @@ export function RelationshipEvidencePanel({
                   {support.event_id ? (
                     <Link
                       className="text-accent hover:underline"
-                      to={`/cases/${caseId}/timeline?event=${support.event_id}`}
+                      to={`/cases/${caseId}/reconstruction?tab=timeline&event=${support.event_id}`}
                     >
                       View event
                     </Link>

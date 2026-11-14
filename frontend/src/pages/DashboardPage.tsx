@@ -180,7 +180,7 @@ export function DashboardPage() {
                 Upload evidence
               </Button>
             </Link>
-            <Link to={`/cases/${selectedCaseId}/findings`}>
+            <Link to={`/cases/${selectedCaseId}/reconstruction?tab=findings`}>
               <Button variant="secondary" icon={<ListChecks size={15} />}>
                 Review findings
               </Button>
@@ -512,7 +512,7 @@ function FindingCard({
         <span>Confidence: {humanize(finding.confidence)}</span>
       </div>
       <div className="mt-2.5 flex flex-wrap gap-2">
-        <Link to={`/cases/${caseId}/findings`}>
+        <Link to={`/cases/${caseId}/reconstruction?tab=findings`}>
           <Button size="sm" variant="ghost" icon={<ArrowRight size={12} />}>
             Review finding
           </Button>

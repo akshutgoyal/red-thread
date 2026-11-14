@@ -20,6 +20,8 @@ export const queryKeys = {
     ["relationship", caseId, relationshipId] as const,
   spatial: (caseId: string) => ["spatial", caseId] as const,
   reconstruction: (caseId: string) => ["reconstruction", caseId] as const,
+  reconstructionSequence: (caseId: string, filters?: Record<string, unknown>) =>
+    ["reconstruction-sequence", caseId, filters ?? {}] as const,
   findings: (caseId: string, filters?: Record<string, unknown>) =>
     ["findings", caseId, filters ?? {}] as const,
   audit: (caseId: string) => ["audit", caseId] as const,
@@ -74,6 +76,17 @@ export function useTimeline(
   return useQuery({
     queryKey: [...queryKeys.timeline(caseId ?? ""), params],
     queryFn: () => api.timeline(caseId as string, params),
+    enabled: Boolean(caseId),
+  });
+}
+
+export function useReconstructionSequence(
+  caseId: string | undefined,
+  params: Parameters<typeof api.reconstructionSequence>[1] = {},
+) {
+  return useQuery({
+    queryKey: queryKeys.reconstructionSequence(caseId ?? "", params),
+    queryFn: () => api.reconstructionSequence(caseId as string, params),
     enabled: Boolean(caseId),
   });
 }

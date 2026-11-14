@@ -22,7 +22,7 @@ import { severityLabel, severityStyle, statusStyle } from "@/lib/severity";
 import { humanize } from "@/lib/format";
 import type { Finding, FindingStatus } from "@/types";
 
-export function FindingsPage() {
+export function FindingsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { caseId } = useParams<{ caseId: string }>();
   const guidanceQuery = useGuidance(caseId);
   const [searchParams] = useSearchParams();
@@ -105,6 +105,8 @@ export function FindingsPage() {
 
   return (
     <div>
+      {embedded ? null : (
+        <>
       <PageHeader
         eyebrow="Findings"
         title="Deterministic findings and correlations"
@@ -132,6 +134,8 @@ export function FindingsPage() {
       />
 
       <PageGuide page="findings" caseId={caseId ?? ""} guidance={guidanceQuery.data} />
+        </>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Total findings" value={findings.length} tone="cyan" />

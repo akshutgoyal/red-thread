@@ -5,10 +5,7 @@ import {
   FolderOpen,
   GitBranch,
   LayoutDashboard,
-  ListChecks,
   ListFilter,
-  Map,
-  ScrollText,
   Search,
   ShieldCheck,
   Sparkles,
@@ -30,18 +27,26 @@ const baseItems = [
 
 const caseItems = [
   { suffix: "", label: "Case overview", icon: Activity, end: true },
+  { suffix: "/reconstruction", label: "Crime reconstruction", icon: Sparkles },
   { suffix: "/evidence", label: "Evidence vault", icon: FileSearch },
   { suffix: "/evidence/intake", label: "Evidence intake", icon: UploadCloud },
   { suffix: "/entities", label: "Entity explorer", icon: Search },
-  { suffix: "/graph", label: "Relationship graph", icon: GitBranch },
   { suffix: "/events", label: "Extracted events", icon: ListFilter },
-  { suffix: "/timeline", label: "Timeline", icon: ScrollText },
-  { suffix: "/spatial", label: "Spatial reconstruction", icon: Map },
+  { suffix: "/graph", label: "Relationship graph", icon: GitBranch },
   { suffix: "/auth", label: "Auth analysis", icon: ShieldCheck },
-  { suffix: "/findings", label: "Findings", icon: ListChecks },
-  { suffix: "/workspace", label: "Workspace", icon: Sparkles },
   { suffix: "/ai", label: "AI assistant", icon: Bot },
   { suffix: "/reports", label: "Reports", icon: FileSearch },
+];
+
+// Timeline, spatial analysis and the findings workspace are part of Crime
+// reconstruction. Their routes still work for bookmarks, but they are reached
+// through the workspace tabs rather than competing with it in the sidebar.
+const reconstructionTabs = [
+  { tab: "sequence", label: "Event reconstruction" },
+  { tab: "timeline", label: "Timeline" },
+  { tab: "relationships", label: "Relationships" },
+  { tab: "locations", label: "Locations" },
+  { tab: "findings", label: "Findings" },
 ];
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
@@ -143,6 +148,20 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               );
             })}
           </div>
+
+          {caseBase && location.pathname.includes("/reconstruction") ? (
+            <div className="mt-2 space-y-0.5 border-l border-line pl-2">
+              {reconstructionTabs.map((item) => (
+                <NavItem
+                  key={item.tab}
+                  to={`${caseBase}/reconstruction?tab=${item.tab}`}
+                  label={item.label}
+                  nested
+                  onNavigate={onNavigate}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
       </nav>
 
@@ -254,19 +273,39 @@ function NavItem({
   icon: Icon,
   end,
   disabled,
+  nested,
   onNavigate,
 }: {
   to: string;
   label: string;
-  icon: typeof LayoutDashboard;
+  icon?: typeof LayoutDashboard;
   end?: boolean;
   disabled?: boolean;
+  nested?: boolean;
   onNavigate?: () => void;
 }) {
+  if (nested) {
+    return (
+      <NavLink
+        to={to}
+        onClick={onNavigate}
+        className={({ isActive }) =>
+          cn(
+            "block rounded-md px-2.5 py-1.5 text-[11px] transition-colors",
+            isActive
+              ? "bg-accent/10 font-medium text-accent"
+              : "text-muted hover:bg-surface-2/60 hover:text-accent",
+          )
+        }
+      >
+        {label}
+      </NavLink>
+    );
+  }
   if (disabled) {
     return (
       <span className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-xs text-muted/60">
-        <Icon size={15} />
+        {Icon ? <Icon size={15} /> : null}
         {label}
       </span>
     );
@@ -285,7 +324,7 @@ function NavItem({
         )
       }
     >
-      <Icon size={15} />
+      {Icon ? <Icon size={15} /> : null}
       {label}
     </NavLink>
   );

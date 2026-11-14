@@ -11,12 +11,14 @@ import { ThemeToggle } from "./ThemeToggle";
 function routeTitle(pathname: string): string {
   if (pathname === "/") return "Dashboard";
   if (pathname === "/cases") return "Cases";
+  if (pathname.includes("/reconstruction")) return "Crime reconstruction";
   if (pathname.includes("/evidence/intake")) return "Evidence intake";
   if (pathname.includes("/evidence")) return "Evidence vault";
   if (pathname.includes("/auth")) return "Authentication analysis";
-  if (pathname.includes("/timeline")) return "Unified timeline";
+  if (pathname.includes("/timeline")) return "Crime reconstruction · Timeline";
+  if (pathname.includes("/spatial")) return "Crime reconstruction · Locations";
   if (pathname.includes("/graph")) return "Relationship graph";
-  if (pathname.includes("/findings")) return "Findings";
+  if (pathname.includes("/findings")) return "Crime reconstruction · Findings";
   if (pathname.includes("/ai")) return "AI investigation assistant";
   if (pathname.includes("/reports")) return "Reports";
   return "Case overview";

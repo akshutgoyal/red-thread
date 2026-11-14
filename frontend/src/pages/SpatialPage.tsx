@@ -11,7 +11,7 @@ import { RelationshipEvidencePanel } from "@/components/relationship/Relationshi
 import { SpatialMap } from "@/components/spatial/SpatialMap";
 import { formatDateTime, humanize } from "@/lib/format";
 
-export function SpatialPage() {
+export function SpatialPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { caseId } = useParams<{ caseId: string }>();
   const guidanceQuery = useGuidance(caseId);
   const spatialQuery = useSpatial(caseId);
@@ -61,13 +61,16 @@ export function SpatialPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Spatial reconstruction"
-        description="Documented GPS fixes and CCTV observations only. The map does not infer routes or movement between isolated points."
-        actions={<Badge>{data?.observations.length ?? 0} observations</Badge>}
-      />
-
-      <PageGuide page="spatial" caseId={caseId ?? ""} guidance={guidanceQuery.data} />
+      {embedded ? null : (
+        <>
+          <PageHeader
+            title="Spatial reconstruction"
+            description="Documented GPS fixes and CCTV observations only. The map does not infer routes or movement between isolated points."
+            actions={<Badge>{data?.observations.length ?? 0} observations</Badge>}
+          />
+          <PageGuide page="spatial" caseId={caseId ?? ""} guidance={guidanceQuery.data} />
+        </>
+      )}
 
       <p className="text-xs text-muted">
         Map times are normalized to UTC. Original source timestamps and their timezone

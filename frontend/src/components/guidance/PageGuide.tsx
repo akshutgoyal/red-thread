@@ -21,6 +21,7 @@ type PageKey =
   | "spatial"
   | "findings"
   | "ai"
+  | "reconstruction"
   | "reports";
 
 interface Explainer {
@@ -60,6 +61,10 @@ const EXPLAINERS: Record<PageKey, Explainer> = {
   findings: {
     what: "Observations about the case, each tied to the evidence that supports it.",
     when: "Use it to review and record a decision on what the analysis surfaced, before generating a report.",
+  },
+  reconstruction: {
+    what: "One workspace joining the sequence of events, the entities involved, how they connect, where events occurred and the evidence behind each claim.",
+    when: "Use it once evidence has been processed. It is the place to understand what happened and in which order, rather than switching between separate tools.",
   },
   ai: {
     what: "An assistant that answers questions using only the records in this case, and cites what it used.",

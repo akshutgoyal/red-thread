@@ -17,15 +17,13 @@ import { CaseOverviewPage } from "@/pages/CaseOverviewPage";
 import { EvidenceVaultPage } from "@/pages/EvidenceVaultPage";
 import { EvidenceIntakePage } from "@/pages/EvidenceIntakePage";
 import { AuthAnalysisPage } from "@/pages/AuthAnalysisPage";
-import { TimelinePage } from "@/pages/TimelinePage";
 import { EventsPage } from "@/pages/EventsPage";
 import { GraphPage } from "@/pages/GraphPage";
-import { FindingsPage } from "@/pages/FindingsPage";
 import { AiAssistantPage } from "@/pages/AiAssistantPage";
 import { ReportsPage } from "@/pages/ReportsPage";
 import { EntityExplorerPage } from "@/pages/EntityExplorerPage";
-import { SpatialPage } from "@/pages/SpatialPage";
-import { ReconstructionPage } from "@/pages/ReconstructionPage";
+import { CrimeReconstructionPage } from "@/pages/CrimeReconstructionPage";
+import { RedirectToTab } from "@/components/layout/RedirectToTab";
 import { TourProvider } from "@/components/tour/TourProvider";
 import { TOURS } from "@/components/tour/tours";
 
@@ -78,12 +76,12 @@ export function App() {
               <Route path="entities" element={<EntityExplorerPage />} />
               <Route path="auth" element={<AuthAnalysisPage />} />
               <Route path="events" element={<EventsPage />} />
-              <Route path="timeline" element={<TimelinePage />} />
               <Route path="graph" element={<GraphPage />} />
-              <Route path="spatial" element={<SpatialPage />} />
-              <Route path="findings" element={<FindingsPage />} />
-              <Route path="reconstruction" element={<ReconstructionPage />} />
-              <Route path="workspace" element={<ReconstructionPage />} />
+              <Route path="reconstruction" element={<CrimeReconstructionPage />} />
+              <Route path="timeline" element={<RedirectToTab tab="timeline" keep={["event"]} />} />
+              <Route path="spatial" element={<RedirectToTab tab="locations" keep={["event"]} />} />
+              <Route path="findings" element={<RedirectToTab tab="findings" keep={["finding"]} />} />
+              <Route path="workspace" element={<RedirectToTab tab="overview" />} />
               <Route path="ai" element={<AiAssistantPage />} />
               <Route path="reports" element={<ReportsPage />} />
             </Route>

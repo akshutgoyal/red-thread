@@ -213,9 +213,9 @@ export function CaseOverviewPage() {
           <CardHeader title="Investigation workspaces" subtitle="Jump to a case view" />
           <CardBody className="grid grid-cols-2 gap-2">
             <WorkspaceLink to={`/cases/${caseId}/auth`} icon={ShieldAlert} label="Auth analysis" />
-            <WorkspaceLink to={`/cases/${caseId}/timeline`} icon={ScrollText} label="Timeline" />
+            <WorkspaceLink to={`/cases/${caseId}/reconstruction?tab=timeline`} icon={ScrollText} label="Timeline" />
             <WorkspaceLink to={`/cases/${caseId}/graph`} icon={GitBranch} label="Graph" />
-            <WorkspaceLink to={`/cases/${caseId}/findings`} icon={ListChecks} label="Findings" />
+            <WorkspaceLink to={`/cases/${caseId}/reconstruction?tab=findings`} icon={ListChecks} label="Findings" />
             <WorkspaceLink to={`/cases/${caseId}/ai`} icon={Bot} label="AI assistant" />
             <WorkspaceLink to={`/cases/${caseId}/reports`} icon={FileSearch} label="Reports" />
           </CardBody>
@@ -279,7 +279,7 @@ export function CaseOverviewPage() {
             subtitle="Deterministic and correlation output"
             action={
               <Link
-                to={`/cases/${caseId}/findings`}
+                to={`/cases/${caseId}/reconstruction?tab=findings`}
                 className="text-xs text-accent hover:text-accent"
               >
                 Review

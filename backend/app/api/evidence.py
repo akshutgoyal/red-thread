@@ -26,6 +26,7 @@ from ..schemas.event import (
     TimelineResponse,
 )
 from ..schemas.evidence import EvidenceRead, HashVerifyResponse, ParseResponse
+from ..schemas.reconstruction import ReconstructionSequenceResponse
 from ..utils.csv_safety import sanitize_csv_row
 from ..schemas.finding import FindingListResponse, FindingRead, FindingReviewRequest
 from ..services import (
@@ -36,6 +37,7 @@ from ..services import (
     mapping_service,
     narrative_service,
     reconciliation_service,
+    reconstruction_service,
     storage_service,
 )
 from ..schemas.mapping import ColumnMappingRequest, ColumnMappingResponse
@@ -346,6 +348,31 @@ def get_timeline(
         total=len(items) + len(undated),
         event_meta=extras.event_meta,
         groups=extras.groups,
+    )
+
+
+@router.get(
+    "/cases/{case_id}/reconstruction/sequence",
+    response_model=ReconstructionSequenceResponse,
+)
+def get_reconstruction_sequence(
+    case_id: str,
+    limit: int = Query(default=1000, ge=1, le=5000),
+    start: str | None = Query(default=None),
+    end: str | None = Query(default=None),
+    evidence_id: str | None = Query(default=None),
+    event_type: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> ReconstructionSequenceResponse:
+    get_case_or_404(db, case_id)
+    return reconstruction_service.build_sequence(
+        db,
+        case_id,
+        limit=limit,
+        evidence_id=evidence_id,
+        event_type=event_type,
+        start=start,
+        end=end,
     )
 
 

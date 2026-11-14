@@ -124,6 +124,66 @@ export interface TimelineResponse {
   groups: TimelineGroup[];
 }
 
+export interface SequenceEntityRef {
+  id: string;
+  entity_type: string;
+  value: string;
+  role: string;
+}
+
+export interface SequenceRelationshipRef {
+  id: string;
+  relationship_type: string;
+  explanation: string;
+  confidence: string;
+  classification: string;
+  review_status: string;
+  counterpart_type: string;
+  counterpart_value: string;
+}
+
+export interface SequenceEvent {
+  id: string;
+  timestamp: string | null;
+  timestamp_raw: string | null;
+  timestamp_confidence: string;
+  timestamp_timezone: string | null;
+  event_type: string;
+  category: string;
+  label: string;
+  description: string;
+  evidence_id: string;
+  source_filename: string;
+  source_locator: string;
+  source_snippet: string;
+  entities: SequenceEntityRef[];
+  relationships: SequenceRelationshipRef[];
+  finding_ids: string[];
+  review_status: string;
+  review_note: string;
+  group_ids: string[];
+  confidence: "documented" | "supported" | "correlated" | "uncertain";
+  confidence_reason: string;
+}
+
+export interface SequenceGap {
+  kind: string;
+  message: string;
+  start: string | null;
+  end: string | null;
+}
+
+export interface ReconstructionSequence {
+  case_id: string;
+  items: SequenceEvent[];
+  undated: SequenceEvent[];
+  total: number;
+  categories: Record<string, number>;
+  groups: TimelineGroup[];
+  gaps: SequenceGap[];
+  limitations: string[];
+}
+
 export interface EntityRecord {
   id: string;
   case_id: string;

@@ -326,7 +326,7 @@ export function EntityExplorerPage() {
                           <div className="mt-1.5 flex flex-wrap gap-3 text-[10px] font-medium">
                             <Link
                               className="text-accent hover:underline"
-                              to={`/cases/${caseId}/timeline?event=${event.id}`}
+                              to={`/cases/${caseId}/reconstruction?tab=timeline&event=${event.id}`}
                             >
                               View timeline event
                             </Link>

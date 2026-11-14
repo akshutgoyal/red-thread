@@ -27,7 +27,7 @@ export function CaseNarrative({
         action={
           truncated ? (
             <Link
-              to={`/cases/${caseId}/workspace`}
+              to={`/cases/${caseId}/reconstruction`}
               className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent-strong"
             >
               Full narrative <ArrowRight size={12} />

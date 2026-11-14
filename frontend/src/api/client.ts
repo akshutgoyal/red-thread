@@ -21,6 +21,7 @@ import type {
   Health,
   ParseResponse,
   ReconstructionResponse,
+  ReconstructionSequence,
   RelationshipDetail,
   RelationshipListResponse,
   ReportRecord,
@@ -246,6 +247,20 @@ export const api = {
     request<SpatialResponse>(`/cases/${caseId}/spatial`, { caseId }),
   reconstruction: (caseId: string) =>
     request<ReconstructionResponse>(`/cases/${caseId}/reconstruction`, { caseId }),
+  reconstructionSequence: (
+    caseId: string,
+    params: {
+      limit?: number;
+      start?: string;
+      end?: string;
+      evidence_id?: string;
+      event_type?: string;
+    } = {},
+  ) =>
+    request<ReconstructionSequence>(
+      `/cases/${caseId}/reconstruction/sequence${query(params)}`,
+      { caseId },
+    ),
 
   listFindings: (
     caseId: string,

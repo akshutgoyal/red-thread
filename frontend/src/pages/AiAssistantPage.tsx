@@ -80,9 +80,9 @@ function StructuredAnswer({ answer, caseId }: { answer: AiAnswer; caseId: string
 }
 
 function recordHref(kind: string, id: string, caseId: string): string {
-  if (kind === "event") return `/cases/${caseId}/timeline?event=${encodeURIComponent(id)}`;
+  if (kind === "event") return `/cases/${caseId}/reconstruction?tab=timeline&event=${encodeURIComponent(id)}`;
   if (kind === "evidence") return `/cases/${caseId}/evidence?evidenceId=${encodeURIComponent(id)}`;
-  if (kind === "finding") return `/cases/${caseId}/findings?finding=${encodeURIComponent(id)}`;
+  if (kind === "finding") return `/cases/${caseId}/reconstruction?tab=findings&finding=${encodeURIComponent(id)}`;
   if (kind === "relationship") {
     return `/cases/${caseId}/graph?focusType=relationship&focusId=${encodeURIComponent(id)}`;
   }
@@ -90,12 +90,12 @@ function recordHref(kind: string, id: string, caseId: string): string {
 }
 
 function citationHref(citation: AiAnswer["citations"][number], caseId: string): string | null {
-  if (citation.event_id) return `/cases/${caseId}/timeline?event=${encodeURIComponent(citation.event_id)}`;
+  if (citation.event_id) return `/cases/${caseId}/reconstruction?tab=timeline&event=${encodeURIComponent(citation.event_id)}`;
   if (citation.evidence_id) return `/cases/${caseId}/evidence?evidenceId=${encodeURIComponent(citation.evidence_id)}`;
   if (citation.kind === "relationship" && citation.id) {
     return `/cases/${caseId}/graph?focusType=relationship&focusId=${encodeURIComponent(citation.id)}`;
   }
-  if (citation.kind === "finding") return `/cases/${caseId}/findings`;
+  if (citation.kind === "finding") return `/cases/${caseId}/reconstruction?tab=findings`;
   return null;
 }
 
