@@ -11,6 +11,7 @@ import { useGenerateReport } from "@/hooks/useApi";
 import { api } from "@/api/client";
 import { useToast } from "@/components/ui/Toast";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PageGuide } from "@/components/guidance/PageGuide";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -47,7 +48,7 @@ export function ReportsPage() {
         title="Traceable investigation exports"
         description="Reports include evidence hashes, provenance, timeline events, findings, limitations and review status. AI content is labelled separately."
         actions={
-          <>
+          <div data-tour="reports-generate" className="flex flex-wrap items-center gap-2">
             <Button
               variant="primary"
               icon={<FileText size={15} />}
@@ -64,9 +65,11 @@ export function ReportsPage() {
             >
               Generate JSON
             </Button>
-          </>
+          </div>
         }
       />
+
+      <PageGuide page="reports" caseId={caseId ?? ""} guidance={guidanceQuery.data} />
 
       <div className="mb-4 rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50/80 dark:bg-amber-500/5 px-4 py-3 text-xs leading-relaxed text-amber-800/80 dark:text-amber-100/80">
         <ShieldAlert size={15} className="mr-1 inline" />
@@ -75,7 +78,7 @@ export function ReportsPage() {
         by the appropriate authorized person.
       </div>
 
-      <Card>
+      <Card data-tour="reports-list">
         <CardHeader
           title="Generated reports"
           subtitle={`${reports.length} report(s) stored for this case`}

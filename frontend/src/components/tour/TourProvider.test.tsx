@@ -159,9 +159,36 @@ describe("tour definitions", () => {
     }
   });
 
-  it("covers the five requested workflows", () => {
+  it("only references anchors that exist in the source", async () => {
+    // A tour step whose anchor does not exist would highlight nothing, so this
+    // asserts the definitions against the actual `data-tour` attributes rather
+    // than trusting them by eye.
+    const modules = import.meta.glob(["/src/**/*.tsx", "!/src/**/*.test.tsx"], {
+      query: "?raw",
+      import: "default",
+      eager: true,
+    }) as Record<string, string>;
+
+    const present = new Set<string>();
+    for (const source of Object.values(modules)) {
+      for (const match of source.matchAll(/data-tour="([a-z0-9-]+)"/g)) {
+        present.add(match[1]);
+      }
+    }
+
+    const missing = new Set<string>();
+    for (const tour of TOURS) {
+      for (const step of tour.steps) {
+        if (step.anchor && !present.has(step.anchor)) missing.add(step.anchor);
+      }
+    }
+
+    expect([...missing]).toEqual([]);
+  });
+
+  it("covers the investigation journey and focused tours", () => {
     const ids = TOURS.map((tour) => tour.id);
-    expect(ids).toContain("first-investigation");
+    expect(ids).toContain("investigation-journey");
     expect(ids).toContain("evidence-integrity");
     expect(ids).toContain("relationship-graph");
     expect(ids).toContain("timeline");

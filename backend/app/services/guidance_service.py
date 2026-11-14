@@ -25,6 +25,7 @@ from ..schemas.guidance import (
     GuidanceSummary,
 )
 from . import ai_service
+from .count_service import case_counts
 
 SETTLED_EVIDENCE_STATUSES = {"parsed", "partially_parsed", "ocr_unavailable"}
 ATTENTION_EVIDENCE_STATUSES = {"uploaded", "parsing", "failed"}
@@ -111,6 +112,8 @@ def build_guidance(
     unreviewed_relationships = [
         item for item in relationship_rows if item.review_status == "unreviewed"
     ]
+    # Canonical counts, shared with the relationship graph and the dashboard.
+    stored = case_counts(db, case_id)
 
     event_reviews = _latest_event_reviews(db, case_id)
     reviewed_event_count = sum(
@@ -135,6 +138,7 @@ def build_guidance(
 
     # ---------------------------------------------------------------- stages
     upload_complete = evidence_count > 0
+    integrity_complete = evidence_count > 0 and not unverified_rows
     processing_complete = evidence_count > 0 and not needs_attention_rows
     events_reviewed = event_count > 0 and (
         reviewed_event_count >= event_count or event_count == 0
@@ -179,8 +183,23 @@ def build_guidance(
             total_count=max(evidence_count, 1),
         ),
         GuidanceStage(
-            key="validate_process",
+            key="verify_integrity",
             index=3,
+            title="Verify evidence integrity",
+            description=(
+                "Re-hashing a stored file proves it still matches the digest recorded "
+                "at intake, so you can show it has not changed since."
+            ),
+            what_to_do="Open each file in the vault and run Verify integrity.",
+            output="A recorded verification for every file you can rely on.",
+            status=status(integrity_complete, evidence_count > 0),
+            href=_case_path(case_id, "evidence"),
+            completed_count=evidence_count - len(unverified_rows),
+            total_count=evidence_count,
+        ),
+        GuidanceStage(
+            key="validate_process",
+            index=4,
             title="Validate and process",
             description=(
                 "Each file is parsed into structured events. Warnings tell you what "
@@ -194,8 +213,23 @@ def build_guidance(
             total_count=evidence_count,
         ),
         GuidanceStage(
+            key="extract_entities",
+            index=5,
+            title="Extracted entities",
+            description=(
+                "Phone numbers, devices, accounts and people are pulled out of the "
+                "records so the same identifier can be followed across sources."
+            ),
+            what_to_do="Open the entity explorer and check that the extracted identifiers are the ones you expected.",
+            output="An entity register with a source reference behind each mention.",
+            status=status(entity_count > 0, entity_count > 0),
+            href=_case_path(case_id, "entities"),
+            completed_count=entity_count,
+            total_count=max(entity_count, 1),
+        ),
+        GuidanceStage(
             key="review_events",
-            index=4,
+            index=6,
             title="Review extracted events",
             description=(
                 "Confirm which extracted events matter to the investigation before "
@@ -210,7 +244,7 @@ def build_guidance(
         ),
         GuidanceStage(
             key="explore_timeline",
-            index=5,
+            index=7,
             title="Explore the timeline",
             description="The timeline places every dated event in order across all sources.",
             what_to_do="Look for sequences, gaps and events that occur close together.",
@@ -222,7 +256,7 @@ def build_guidance(
         ),
         GuidanceStage(
             key="understand_relationships",
-            index=6,
+            index=8,
             title="Understand relationships",
             description=(
                 "Relationships show which entities appear together and which evidence "
@@ -235,12 +269,12 @@ def build_guidance(
                 relationships_complete,
             ),
             href=_case_path(case_id, "graph"),
-            completed_count=len(relationship_rows) - len(unreviewed_relationships),
-            total_count=len(relationship_rows),
+            completed_count=stored.total_relationships - stored.unreviewed_relationships,
+            total_count=stored.total_relationships,
         ),
         GuidanceStage(
             key="investigate_patterns",
-            index=7,
+            index=9,
             title="Investigate suspicious patterns",
             description=(
                 "High-severity findings mark activity that deserves a closer look. "
@@ -255,7 +289,7 @@ def build_guidance(
         ),
         GuidanceStage(
             key="ai_analysis",
-            index=8,
+            index=10,
             title="AI-assisted analysis",
             description=(
                 "The copilot answers questions using only the records in this case and "
@@ -270,7 +304,7 @@ def build_guidance(
         ),
         GuidanceStage(
             key="generate_report",
-            index=9,
+            index=11,
             title="Generate the investigation report",
             description=(
                 "The report collects the evidence inventory, timeline, findings and "
@@ -419,6 +453,12 @@ def build_guidance(
             open_findings=len(open_findings),
             unreviewed_relationships=len(unreviewed_relationships),
             reports=report_count,
+            total_relationships=stored.total_relationships,
+            documented_relationships=stored.documented_relationships,
+            inferred_leads=stored.inferred_leads,
+            unique_connections=stored.unique_connections,
+            raw_edges=stored.raw_edges,
+            structural_edges=stored.containment_edges,
         ),
         scanned_events=event_count,
     )

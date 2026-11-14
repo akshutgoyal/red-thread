@@ -54,9 +54,11 @@ export function CasesPage() {
         title="Investigation cases"
         description="Each case is an isolated evidence vault with its own events, findings, graph and reports."
         actions={
-          <Button variant="primary" icon={<Plus size={15} />} onClick={() => setOpen(true)}>
-            New case
-          </Button>
+          <div data-tour="cases-create">
+            <Button variant="primary" icon={<Plus size={15} />} onClick={() => setOpen(true)}>
+              New case
+            </Button>
+          </div>
         }
       />
 

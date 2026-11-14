@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Search, Waypoints } from "lucide-react";
-import { useEntities, useEntityDetail, useEvidence } from "@/hooks/useApi";
+import { useEntities, useEntityDetail, useEvidence, useGuidance } from "@/hooks/useApi";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PageGuide } from "@/components/guidance/PageGuide";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -21,6 +22,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 export function EntityExplorerPage() {
   const { caseId } = useParams<{ caseId: string }>();
+  const guidanceQuery = useGuidance(caseId);
   const entitiesQuery = useEntities(caseId);
   const evidenceQuery = useEvidence(caseId ?? "");
   const [search, setSearch] = useState("");
@@ -71,6 +73,8 @@ export function EntityExplorerPage() {
         description="Identifiers, accounts, devices, IP addresses and documented locations extracted from the evidence."
         actions={<Badge>{entities.length} entities</Badge>}
       />
+
+      <PageGuide page="entities" caseId={caseId ?? ""} guidance={guidanceQuery.data} />
 
       <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
         <Card className="h-fit">
@@ -149,7 +153,7 @@ export function EntityExplorerPage() {
           </CardBody>
         </Card>
 
-        <div className="space-y-5">
+        <div className="space-y-5" data-tour="entities-list">
           {!selectedEntityId ? (
             <Card>
               <CardBody>

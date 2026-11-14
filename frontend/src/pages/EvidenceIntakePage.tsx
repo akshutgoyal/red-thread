@@ -12,13 +12,10 @@ import {
   UploadCloud,
   XCircle,
 } from "lucide-react";
-import {
-  useParseEvidence,
-  useUploadEvidence,
-  useVerifyEvidence,
-} from "@/hooks/useApi";
+import { useGuidance, useParseEvidence, useUploadEvidence, useVerifyEvidence } from "@/hooks/useApi";
 import { useToast } from "@/components/ui/Toast";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PageGuide } from "@/components/guidance/PageGuide";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -84,6 +81,7 @@ function StageIcon({ state }: { state: StageState }) {
 
 export function EvidenceIntakePage() {
   const { caseId } = useParams<{ caseId: string }>();
+  const guidanceQuery = useGuidance(caseId);
   const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const upload = useUploadEvidence(caseId ?? "");
@@ -204,6 +202,20 @@ export function EvidenceIntakePage() {
         }
       />
 
+      <PageGuide page="evidence-intake" caseId={caseId ?? ""} guidance={guidanceQuery.data} />
+
+      <div
+        data-tour="warning-panel"
+        className="mb-4 rounded-xl border border-line bg-surface-2/40 px-4 py-3 text-xs leading-relaxed text-secondary"
+      >
+        <p className="font-semibold text-primary">How warnings work</p>
+        <p className="mt-1 text-muted">
+          When a file cannot be read completely, the parser records a warning here saying what
+          happened, why it matters, what to do, and whether the file is still usable. Warnings
+          never block the rest of the file.
+        </p>
+      </div>
+
       <div className="mb-4 grid gap-2 rounded-xl border border-line bg-surface-2/40 px-4 py-3 text-xs leading-relaxed text-muted sm:grid-cols-3">
         <p>
           <span className="font-semibold text-secondary">What this does: </span>
@@ -296,7 +308,7 @@ export function EvidenceIntakePage() {
               : "Each file shows its own progress"
           }
         />
-        <CardBody className="space-y-3">
+        <CardBody className="space-y-3" data-tour="evidence-pipeline">
           {results.length === 0 ? (
             <EmptyState
               title="No files processed yet"
@@ -368,10 +380,7 @@ export function EvidenceIntakePage() {
                   </div>
                 </div>
 
-                <div
-                  className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5"
-                  data-tour="evidence-pipeline"
-                >
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
                   {fileStages(result).map((stage, stageIndex) => (
                     <span
                       key={stage.label}
@@ -427,7 +436,7 @@ export function EvidenceIntakePage() {
                 ) : null}
 
                 {(result.parse?.warning_details?.length ?? 0) > 0 ? (
-                  <ul className="mt-2.5 space-y-2" data-tour="warning-panel">
+                  <ul className="mt-2.5 space-y-2">
                     {(result.parse?.warning_details ?? []).map((detail, detailIndex) => (
                       <WarningItem
                         key={`${result.filename}-w-${detailIndex}`}

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { CalendarClock, GitBranch, Search, ShieldQuestion } from "lucide-react";
-import { useEvidence, useReviewEvent, useTimeline, useEventReviews } from "@/hooks/useApi";
+import { useEventReviews, useEvidence, useGuidance, useReviewEvent, useTimeline } from "@/hooks/useApi";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PageGuide } from "@/components/guidance/PageGuide";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Drawer } from "@/components/ui/Drawer";
@@ -36,6 +37,7 @@ type ViewMode = "all" | "correlated" | "suspicious";
 
 export function TimelinePage() {
   const { caseId } = useParams<{ caseId: string }>();
+  const guidanceQuery = useGuidance(caseId);
   const [searchParams] = useSearchParams();
   const deepEventId = searchParams.get("event");
   const [search, setSearch] = useState("");
@@ -163,6 +165,8 @@ export function TimelinePage() {
         title="Investigation timeline"
         description="Every extracted event in time order, with a readable description and the source record behind it. Grouped events share a documented relationship — proximity alone is never presented as causation."
       />
+
+      <PageGuide page="timeline" caseId={caseId ?? ""} guidance={guidanceQuery.data} />
 
       <Card className="mb-4">
         <CardBody className="flex flex-wrap items-center gap-2">

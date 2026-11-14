@@ -82,6 +82,32 @@ class GraphEdgeRead(BaseModel):
     review_status: str | None = None
 
 
+class GraphCounts(BaseModel):
+    """Every count the graph page is allowed to display.
+
+    These are the canonical, case-wide numbers. Anything derived from the
+    rendered canvas is reported separately as *visible* so the two can never be
+    confused with one another.
+    """
+
+    total_relationships: int = 0
+    documented_relationships: int = 0
+    inferred_leads: int = 0
+    unreviewed_relationships: int = 0
+    unique_connections: int = 0
+    raw_edges: int = 0
+    structural_edges: int = 0
+    entities_in_case: int = 0
+    entities_with_events: int = 0
+    entity_nodes: int = 0
+    event_nodes: int = 0
+    evidence_nodes: int = 0
+    total_nodes: int = 0
+    total_edges: int = 0
+    temporal_edges: int = 0
+
+
 class GraphResponse(BaseModel):
     nodes: list[GraphNodeRead]
     edges: list[GraphEdgeRead]
+    counts: GraphCounts = GraphCounts()

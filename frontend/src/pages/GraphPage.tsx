@@ -9,15 +9,17 @@ import {
   Search,
   Waypoints,
 } from "lucide-react";
-import { useEntityDetail, useEvidence, useGraph } from "@/hooks/useApi";
+import { useEntityDetail, useEvidence, useGraph, useGuidance } from "@/hooks/useApi";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PageGuide } from "@/components/guidance/PageGuide";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
 import { Input, Select } from "@/components/ui/Field";
-import { SegmentedControl } from "@/components/ui/Primitives";
+import { SegmentedControl, TermHelp } from "@/components/ui/Primitives";
 import { RelationshipEvidencePanel } from "@/components/relationship/RelationshipEvidencePanel";
+import { GLOSSARY } from "@/lib/glossary";
 import { formatDateTime, humanize } from "@/lib/format";
 import { useTheme } from "@/theme/ThemeContext";
 import type { GraphEdge, GraphNode } from "@/types";
@@ -220,8 +222,26 @@ function edgeIsContainment(edge: GraphEdge): boolean {
   );
 }
 
+function CountStat({
+  value,
+  label,
+  hint,
+}: {
+  value: number;
+  label: string;
+  hint: string;
+}) {
+  return (
+    <span className="inline-flex items-baseline gap-1.5">
+      <span className="text-sm font-semibold text-primary">{value.toLocaleString()}</span>
+      <TermHelp term={label} text={hint} />
+    </span>
+  );
+}
+
 export function GraphPage() {
   const { caseId } = useParams<{ caseId: string }>();
+  const guidanceQuery = useGuidance(caseId);
   const { theme } = useTheme();
   const nodeColors = theme === "dark" ? NODE_COLORS_DARK : NODE_COLORS_LIGHT;
   const palette = GRAPH_PALETTES[theme];
@@ -251,6 +271,7 @@ export function GraphPage() {
 
   const nodes = useMemo(() => graphQuery.data?.nodes ?? [], [graphQuery.data]);
   const edges = useMemo(() => graphQuery.data?.edges ?? [], [graphQuery.data]);
+  const counts = graphQuery.data?.counts;
   const evidenceNames = useMemo(() => {
     const map = new Map<string, string>();
     for (const item of evidenceQuery.data ?? []) map.set(item.id, item.original_filename);
@@ -393,11 +414,16 @@ export function GraphPage() {
   const visibleCounts = useMemo(() => {
     let nodeCount = 0;
     let edgeCount = 0;
+    let entityCount = 0;
     for (const element of visibleElements) {
-      if ("source" in element.data) edgeCount += 1;
-      else nodeCount += 1;
+      if ("source" in element.data) {
+        edgeCount += 1;
+      } else {
+        nodeCount += 1;
+        if (element.data.node_type === "entity") entityCount += 1;
+      }
     }
-    return { nodeCount, edgeCount };
+    return { nodeCount, edgeCount, entityCount };
   }, [visibleElements]);
 
   const resetView = () => {
@@ -423,6 +449,7 @@ export function GraphPage() {
 
   return (
     <div>
+      <div data-tour="graph-overview">
       <PageHeader
         eyebrow="Relationship graph"
         title="How the evidence connects"
@@ -460,11 +487,59 @@ export function GraphPage() {
         }
       />
 
+      <PageGuide page="graph" caseId={caseId ?? ""} guidance={guidanceQuery.data} />
+      </div>
+
+      {counts ? (
+        <div
+          data-tour="graph-counts"
+          className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-line bg-surface-2/40 px-4 py-3 text-xs text-secondary"
+        >
+          <CountStat
+            value={counts.total_relationships}
+            label="total relationships"
+            hint={GLOSSARY.relationship}
+          />
+          <CountStat
+            value={counts.documented_relationships}
+            label="documented"
+            hint={GLOSSARY.documented_relationship}
+          />
+          <CountStat
+            value={counts.inferred_leads}
+            label="inferred leads"
+            hint={GLOSSARY.inferred_lead}
+          />
+          <CountStat
+            value={counts.unique_connections}
+            label="unique entity pairs"
+            hint={GLOSSARY.unique_connection}
+          />
+          <CountStat
+            value={counts.entities_in_case}
+            label="entities in case"
+            hint={GLOSSARY.entity}
+          />
+          {counts.entities_in_case > counts.entity_nodes ? (
+            <CountStat
+              value={counts.entity_nodes}
+              label="drawn on canvas"
+              hint="Entities that appear as graph nodes. An entity with no linked event or relationship has nothing to draw."
+            />
+          ) : null}
+          <span className="ml-auto text-[11px] text-muted">
+            {counts.total_relationships !== counts.unique_connections
+              ? "Several relationships describe the same entity pair under different rules, so pairs can be fewer than relationships."
+              : "Every relationship here describes a different entity pair."}
+          </span>
+        </div>
+      ) : null}
+
       {simple ? (
         <div className="mb-4 rounded-xl border border-accent/20 bg-accent/5 px-4 py-3 text-xs leading-relaxed text-secondary">
           <span className="font-semibold text-accent">Simple mode: </span>
-          {importantEntityIds.size > 0
-            ? `Showing ${importantEntityIds.size} entities that have a documented connection, and only those connections. Switch to Advanced to see raw events and evidence files.`
+          {counts && counts.entity_nodes > 0
+            ? `Showing ${counts.entity_nodes} entities that have a documented connection, and only those connections. Switch to Advanced to see raw events and evidence files.`
             : "No documented entity-to-entity connections yet. Parse evidence or enable temporal leads to find candidates."}
         </div>
       ) : null}
@@ -473,10 +548,11 @@ export function GraphPage() {
         <Card className="min-w-0">
           <CardHeader
             title="Graph canvas"
-            subtitle={`${visibleCounts.nodeCount} of ${nodes.filter((node) => {
-              const category = nodeCategory(node);
-              return category !== "evidence" && category !== "event";
-            }).length || nodes.length} nodes · ${visibleCounts.edgeCount} of ${edges.length} connections shown`}
+            subtitle={
+              counts
+                ? `${visibleCounts.nodeCount} of ${counts.total_nodes} nodes · ${visibleCounts.edgeCount} of ${counts.total_edges} connections shown`
+                : `${visibleCounts.nodeCount} nodes · ${visibleCounts.edgeCount} connections shown`
+            }
             action={
               <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted">
                 {!simple ? (

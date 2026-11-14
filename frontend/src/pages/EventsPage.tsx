@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ListFilter, Search } from "lucide-react";
-import { useEvents, useEventReviews, useEvidence, useReviewEvent } from "@/hooks/useApi";
+import { useEventReviews, useEvents, useEvidence, useGuidance, useReviewEvent } from "@/hooks/useApi";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PageGuide } from "@/components/guidance/PageGuide";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -32,6 +33,7 @@ type ReviewFilter = "all" | "unreviewed" | "relevant" | "needs_review" | "not_re
 
 export function EventsPage() {
   const { caseId } = useParams<{ caseId: string }>();
+  const guidanceQuery = useGuidance(caseId);
   const [searchParams] = useSearchParams();
   const initialEvidence = searchParams.get("evidenceId") ?? "all";
   const [search, setSearch] = useState("");
@@ -103,6 +105,8 @@ export function EventsPage() {
         title="Extracted events"
         description="Every row the parsers extracted, in readable form. Mark events relevant, not relevant, or needing review; decisions are stored with an audit trail and never delete the source evidence."
       />
+
+      <PageGuide page="events" caseId={caseId ?? ""} guidance={guidanceQuery.data} />
 
       <PageIntro
         what="A flat, searchable list of every extracted event before it is placed on the timeline."

@@ -49,6 +49,14 @@ class GuidanceSummary(BaseModel):
     open_findings: int = 0
     unreviewed_relationships: int = 0
     reports: int = 0
+    # Canonical relationship counts. These are the same numbers the relationship
+    # graph reports, so a connection count means one thing across the product.
+    total_relationships: int = 0
+    documented_relationships: int = 0
+    inferred_leads: int = 0
+    unique_connections: int = 0
+    raw_edges: int = 0
+    structural_edges: int = 0
 
 
 class GuidanceResponse(BaseModel):

@@ -1,65 +1,227 @@
 import type { TourDefinition } from "./TourProvider";
 
 /**
- * Guided tours.
+ * Guided investigation journey.
  *
- * Every `route` is a real route in the app and every `anchor` matches a
- * `data-tour` attribute on a real element. No step describes UI that does not
- * exist, and no step performs an action on the investigator's behalf.
+ * One ordered tour covering the full investigation, plus five focused tours for
+ * returning to a single topic. Every `route` is a real route in the app and
+ * every `anchor` matches a `data-tour` attribute on a real element. No step
+ * describes UI that does not exist, and no step performs an action on the
+ * investigator's behalf.
+ *
+ * The journey is deliberately ordered so the relationship graph appears only
+ * after evidence, entities and events have been explained. A first-time
+ * investigator should understand what a connection is made of before seeing a
+ * dense connection map.
  */
 export const TOURS: TourDefinition[] = [
   {
-    id: "first-investigation",
-    name: "Create your first investigation",
-    description: "Set up a case and learn what the workspace contains.",
+    id: "investigation-journey",
+    name: "Complete investigation journey",
+    description:
+      "The full workflow, from opening a case to generating a report, in the order an investigation actually runs.",
     steps: [
+      // ---------------------------------------------------------- dashboard
       {
         route: "",
         anchor: "case-selector",
-        title: "Pick the investigation",
-        body: "Everything you do happens inside a case. This selector switches between the investigations you can access.",
-        hint: "The demo case is synthetic data you can explore freely.",
+        title: "Every investigation is a case",
+        body: "A case groups all evidence, extracted events, findings and reports for one investigation. This selector switches between the cases you can open.",
       },
       {
         route: "",
         anchor: "next-action",
-        title: "Follow the next action",
-        body: "Red Thread computes what to do next from the case's stored records. It never guesses — this panel is derived from evidence, review state and reports.",
-        hint: "You can dismiss it for the session, and it returns when the state changes.",
+        title: "Red Thread tells you the next step",
+        body: "This panel is computed from the case's stored records, not written by hand. It names one action and explains why it matters now.",
+        hint: "You can dismiss it, but it returns when the case state changes.",
       },
       {
         route: "",
         anchor: "workflow-progress",
-        title: "Know where you are",
-        body: "The investigation runs in nine stages, from evidence intake to the report. Complete, in progress and not started are read from real data.",
+        title: "Where this case stands",
+        body: "The investigation runs through a fixed sequence. Each stage reports complete, in progress or not started based on real data — opening a page never marks it complete.",
       },
+
+      // ------------------------------------------------------ create a case
       {
-        route: "/evidence/intake",
-        anchor: "evidence-dropzone",
-        title: "Add evidence",
-        body: "Upload the files you were given. Each one is hashed with SHA-256 before parsing, so you can prove later that the stored bytes never changed.",
-        hint: "Supported types are listed here; nothing you upload is executed.",
-      },
-      {
-        route: "/evidence",
-        anchor: "evidence-table",
-        title: "See what was processed",
-        body: "The vault lists every file with its digest, parser and processing status. Open a row to inspect metadata, map columns, or verify integrity.",
-      },
-      {
-        route: "/events",
-        anchor: "events-list",
-        title: "Review extracted events",
-        body: "Parsers turn files into readable events. Mark each one relevant or not relevant — decisions are audited and never delete the source evidence.",
+        route: "/cases",
+        appRoute: true,
+        anchor: "cases-create",
+        title: "Create an investigation",
+        body: "Name the case and record what you are looking into. That title and description become the context for everyone who opens it.",
+        hint: "You can return here at any time to start another case.",
       },
       {
         route: "",
         anchor: "narrative",
-        title: "Read the case summary",
-        body: "The narrative lists chronological observations with links back to the record behind each statement. It describes what was recorded, not a proven sequence.",
+        title: "The case overview connects everything",
+        body: "Evidence is processed into events, events mention entities, entities form relationships, and relationships support findings. Each step inherits from the one before it.",
+      },
+
+      // ---------------------------------------------------- evidence intake
+      {
+        route: "/evidence/intake",
+        anchor: "evidence-dropzone",
+        title: "Step 1 — Upload evidence",
+        body: "Start with the files you were given: logs, exports, images, location data. Each file is hashed with SHA-256 before parsing, so its stored bytes can be verified later.",
+        hint: "Nothing you upload is executed. Unsupported files are rejected rather than guessed at.",
+      },
+      {
+        route: "/evidence/intake",
+        anchor: "evidence-pipeline",
+        title: "What processing did to each file",
+        body: "Every file has its own pipeline: uploaded, hashed, parsed, and how many records were extracted or rejected.",
+      },
+      {
+        route: "/evidence/intake",
+        anchor: "warning-panel",
+        title: "Warnings explain themselves",
+        body: "A parser warning states what happened, why it matters, what to do about it, and whether the file is still usable.",
+      },
+      {
+        route: "/evidence",
+        anchor: "evidence-table",
+        title: "Step 2 — Verify integrity",
+        body: "The vault keeps each file's original name, size, SHA-256 digest and upload time. Open a row to verify the stored bytes still match the digest.",
+        hint: "Integrity shows the file is unchanged since intake — not that it was authentic when collected.",
+      },
+
+      // ------------------------------------------------------------ entities
+      {
+        route: "/entities",
+        anchor: "entities-list",
+        title: "Step 3 — Entities",
+        body: "An entity is a person, phone number, device, account or identifier found in the evidence. Each one records which records mention it.",
+      },
+      {
+        route: "/entities",
+        anchor: "entities-list",
+        title: "Follow an entity back to its source",
+        body: "Opening an entity lists the events that mention it and the files those events came from, so you can confirm it is the same identifier and not a coincidence.",
+      },
+
+      // -------------------------------------------------------------- events
+      {
+        route: "/events",
+        anchor: "events-list",
+        title: "Step 4 — Events",
+        body: "Information from different sources is converted into a common format called a normalised event, so a chat message and a login record can be compared.",
+      },
+      {
+        route: "/events",
+        anchor: "events-list",
+        title: "Confirm what was extracted",
+        body: "Check the original record beside each extracted event. Marking an event relevant or not relevant is written to the audit trail and never deletes evidence.",
+      },
+
+      // ------------------------------------------------------------ timeline
+      {
+        route: "/timeline",
+        anchor: "timeline-view",
+        title: "Step 5 — Timeline",
+        body: "The timeline orders every dated event across all sources. Chronology is often what turns separate records into a sequence worth investigating.",
+      },
+      {
+        route: "/timeline",
+        anchor: "timeline-filters",
+        title: "Compare sources",
+        body: "Filter by evidence file or date range to compare what different sources recorded at the same time. Filtering happens on the server.",
+        hint: "Timestamps carry a confidence value; clock drift between devices is common.",
+      },
+      {
+        route: "/timeline",
+        anchor: "timeline-events",
+        title: "Records without a timestamp",
+        body: "Event cards state their timestamp confidence. Records with no usable timestamp are listed in a separate section below instead of being forced into a position they cannot be proven to hold.",
+      },
+
+      // --------------------------------------------------------------- graph
+      {
+        route: "/graph",
+        anchor: "graph-overview",
+        title: "Step 6 — What this graph is",
+        body: "Only now does the relationship graph make sense. Each node is an entity you have just reviewed; each line is a connection between two of them, backed by stored records.",
+      },
+      {
+        route: "/graph",
+        anchor: "graph-counts",
+        title: "Read the counts precisely",
+        body: "Total relationships counts every stored connection. Unique entity pairs counts each pair once, because several rules can describe the same pair. Inferred leads are hypotheses, not facts.",
+        hint: "These numbers are computed from stored rows and match the workspace and dashboard.",
+      },
+      {
+        route: "/graph",
+        anchor: "graph-canvas",
+        title: "Explore the connections",
+        body: "Select an entity to see its mentions and every connection it takes part in. Solid lines are documented matches; dashed lines are heuristic leads.",
+      },
+      {
+        route: "/graph",
+        anchor: "graph-selection",
+        title: "Always check the supporting evidence",
+        body: "Clicking a connection shows its explanation and the exact records behind it. A connection is a lead until you have checked those records — it never proves shared identity or guilt.",
+      },
+      {
+        route: "/graph",
+        anchor: "graph-filters",
+        title: "Reduce the noise",
+        body: "Filter by evidence source, review status or entity visibility. Add temporal leads only when you want candidate connections based on timing.",
+      },
+
+      // -------------------------------------------------------------- spatial
+      {
+        route: "/spatial",
+        anchor: "spatial-map",
+        title: "Step 7 — Where things happened",
+        body: "Locations are taken only from recorded evidence such as GPS, cell towers or place labels. Nothing is inferred to fill a gap.",
+        hint: "An empty map means no location data was recorded, not that nothing happened.",
+      },
+
+      // ------------------------------------------------------------------ ai
+      {
+        route: "/ai",
+        anchor: "ai-suggestions",
+        title: "Step 8 — Ask about the evidence",
+        body: "Suggested questions come from this case's actual state. The assistant answers only from stored records and says so when the evidence is insufficient.",
+      },
+      {
+        route: "/ai",
+        anchor: "ai-conversation",
+        title: "Separate interpretation from fact",
+        body: "Answers label themselves as observation, correlation, inference or hypothesis. Only the first two are grounded in records; the rest are hypotheses you must verify.",
+        hint: "AI output is never a finding until a human reviews it.",
+      },
+
+      // ------------------------------------------------------------ findings
+      {
+        route: "/findings",
+        anchor: "findings-list",
+        title: "Step 9 — Findings and review",
+        body: "A finding is an observation tied to the evidence that supports it. Severity is a triage signal, not a verdict.",
+      },
+      {
+        route: "/findings",
+        anchor: "findings-list",
+        title: "Record a human decision",
+        body: "Each finding carries a review status and any annotations. Unresolved questions stay visible so they are not lost in the report.",
+      },
+
+      // ------------------------------------------------------------- reports
+      {
+        route: "/reports",
+        anchor: "reports-generate",
+        title: "Step 10 — Generate the report",
+        body: "The report assembles the case, its evidence digests, events, relationships, findings, review decisions and unresolved questions into a draft document.",
+      },
+      {
+        route: "/reports",
+        anchor: "reports-list",
+        title: "Reports are drafts for human review",
+        body: "Provenance and source references are included so every statement can be traced back. The report does not determine guilt and cannot be treated as a court finding without expert review.",
       },
     ],
   },
+
   {
     id: "evidence-integrity",
     name: "Upload and verify evidence",
@@ -99,6 +261,7 @@ export const TOURS: TourDefinition[] = [
       },
     ],
   },
+
   {
     id: "relationship-graph",
     name: "Explore relationship graphs",
@@ -109,6 +272,12 @@ export const TOURS: TourDefinition[] = [
         anchor: "graph-canvas",
         title: "The connection map",
         body: "Entities such as phone numbers, devices and accounts are nodes. A line means a documented connection between them.",
+      },
+      {
+        route: "/graph",
+        anchor: "graph-counts",
+        title: "What the counts mean",
+        body: "Relationships are stored connections; unique entity pairs counts each pair once. If both numbers differ, several rules describe the same pair.",
       },
       {
         route: "/graph",
@@ -143,6 +312,7 @@ export const TOURS: TourDefinition[] = [
       },
     ],
   },
+
   {
     id: "timeline",
     name: "Build an investigation timeline",
@@ -169,17 +339,12 @@ export const TOURS: TourDefinition[] = [
       {
         route: "/timeline",
         anchor: "timeline-events",
-        title: "Open the source record",
-        body: "Selecting an event shows the original record, the extracted fields, and any linked findings — plus its review decision.",
-      },
-      {
-        route: "/timeline",
-        anchor: "timeline-undated",
         title: "Undated records stay visible",
-        body: "Records without a usable timestamp are listed separately instead of being forced into a false position.",
+        body: "Records without a usable timestamp are listed separately below the dated events instead of being forced into a false position.",
       },
     ],
   },
+
   {
     id: "ai-assistant",
     name: "Use the AI investigation assistant",
@@ -203,12 +368,6 @@ export const TOURS: TourDefinition[] = [
         title: "Check the citations",
         body: "Each answer lists the records it used. Verified citations link straight to the evidence or event.",
         hint: "An unverified citation is a warning sign, not a source.",
-      },
-      {
-        route: "/ai",
-        anchor: "ai-conversation",
-        title: "Separate observation from interpretation",
-        body: "Answers label themselves as observation, correlation, inference or hypothesis, and list limitations separately.",
       },
       {
         route: "/ai",

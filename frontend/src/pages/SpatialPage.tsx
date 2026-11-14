@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { MapPin } from "lucide-react";
-import { useEvidence, useSpatial } from "@/hooks/useApi";
+import { useEvidence, useGuidance, useSpatial } from "@/hooks/useApi";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PageGuide } from "@/components/guidance/PageGuide";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
@@ -12,6 +13,7 @@ import { formatDateTime, humanize } from "@/lib/format";
 
 export function SpatialPage() {
   const { caseId } = useParams<{ caseId: string }>();
+  const guidanceQuery = useGuidance(caseId);
   const spatialQuery = useSpatial(caseId);
   const evidenceQuery = useEvidence(caseId);
   const [searchParams] = useSearchParams();
@@ -65,6 +67,8 @@ export function SpatialPage() {
         actions={<Badge>{data?.observations.length ?? 0} observations</Badge>}
       />
 
+      <PageGuide page="spatial" caseId={caseId ?? ""} guidance={guidanceQuery.data} />
+
       <p className="text-xs text-muted">
         Map times are normalized to UTC. Original source timestamps and their timezone
         context remain available in the timeline and evidence records. Map tiles load from
@@ -106,7 +110,7 @@ export function SpatialPage() {
         </span>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+      <div data-tour="spatial-map" className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
         <Card>
           <CardHeader
             title="Documented coordinate plot"

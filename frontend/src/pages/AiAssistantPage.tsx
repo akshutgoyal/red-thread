@@ -9,14 +9,10 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
-import {
-  useAiStatus,
-  useAiSuggestions,
-  useAskAi,
-  useCreateAnnotation,
-} from "@/hooks/useApi";
+import { useAiStatus, useAiSuggestions, useAskAi, useCreateAnnotation, useGuidance } from "@/hooks/useApi";
 import { useToast } from "@/components/ui/Toast";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PageGuide } from "@/components/guidance/PageGuide";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -111,6 +107,7 @@ export function AiAssistantPage() {
   const toast = useToast();
   const statusQuery = useAiStatus();
   const suggestionsQuery = useAiSuggestions(caseId);
+  const guidanceQuery = useGuidance(caseId);
   const askAi = useAskAi(caseId ?? "");
   const createAnnotation = useCreateAnnotation(caseId ?? "");
   const transcriptKey = caseId ? `red-thread.ai.transcript.${caseId}` : "";
@@ -295,6 +292,8 @@ TOKENHARBOR_MODEL=deepseek-v4.1-flash:free`}
           </Button>
         }
       />
+
+      <PageGuide page="ai" caseId={caseId ?? ""} guidance={guidanceQuery.data} />
 
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-violet-200 dark:border-violet-500/20 bg-violet-50/80 dark:bg-violet-500/5 px-4 py-3 text-xs text-violet-800/80 dark:text-violet-100/80">
         <Sparkles size={14} />

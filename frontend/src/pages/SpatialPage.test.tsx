@@ -9,7 +9,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/hooks/useApi", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/hooks/useApi")>();
-  return { ...actual, useSpatial: mocks.useSpatial, useEvidence: mocks.useEvidence };
+  return {
+    ...actual,
+    useSpatial: mocks.useSpatial,
+    useEvidence: mocks.useEvidence,
+    useGuidance: () => ({ data: undefined, isLoading: false, error: null }),
+  };
 });
 vi.mock("@/components/spatial/SpatialMap", () => ({
   SpatialMap: ({ observations }: { observations: unknown[] }) => (

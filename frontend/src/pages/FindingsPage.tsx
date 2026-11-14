@@ -8,9 +8,10 @@ import {
   Search,
   XCircle,
 } from "lucide-react";
-import { useFindings, useReconcile, useReviewFinding } from "@/hooks/useApi";
+import { useFindings, useGuidance, useReconcile, useReviewFinding } from "@/hooks/useApi";
 import { useToast } from "@/components/ui/Toast";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PageGuide } from "@/components/guidance/PageGuide";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -23,6 +24,7 @@ import type { Finding, FindingStatus } from "@/types";
 
 export function FindingsPage() {
   const { caseId } = useParams<{ caseId: string }>();
+  const guidanceQuery = useGuidance(caseId);
   const [searchParams] = useSearchParams();
   const deepFindingId = searchParams.get("finding");
   const toast = useToast();
@@ -129,6 +131,8 @@ export function FindingsPage() {
         }
       />
 
+      <PageGuide page="findings" caseId={caseId ?? ""} guidance={guidanceQuery.data} />
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Total findings" value={findings.length} tone="cyan" />
         <Metric
@@ -148,7 +152,7 @@ export function FindingsPage() {
         />
       </div>
 
-      <Card className="mt-5">
+      <Card className="mt-5" data-tour="findings-list">
         <CardHeader
           title="Findings register"
           subtitle={`${filtered.length} of ${findings.length} findings`}

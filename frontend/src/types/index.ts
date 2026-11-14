@@ -163,9 +163,28 @@ export interface GraphEdge {
   data?: Record<string, unknown>;
 }
 
+export interface GraphCounts {
+  total_relationships: number;
+  documented_relationships: number;
+  inferred_leads: number;
+  unreviewed_relationships: number;
+  unique_connections: number;
+  raw_edges: number;
+  structural_edges: number;
+  entities_in_case: number;
+  entities_with_events: number;
+  entity_nodes: number;
+  event_nodes: number;
+  evidence_nodes: number;
+  total_nodes: number;
+  total_edges: number;
+  temporal_edges: number;
+}
+
 export interface GraphResponse {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  counts: GraphCounts;
 }
 
 export interface FindingEvidence {
@@ -449,6 +468,12 @@ export interface GuidanceSummary {
   open_findings: number;
   unreviewed_relationships: number;
   reports: number;
+  total_relationships: number;
+  documented_relationships: number;
+  inferred_leads: number;
+  unique_connections: number;
+  raw_edges: number;
+  structural_edges: number;
 }
 
 export interface GuidanceResponse {

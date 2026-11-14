@@ -9,16 +9,12 @@ import {
   ShieldCheck,
   UploadCloud,
 } from "lucide-react";
-import {
-  useAudit,
-  useEvidence,
-  useParseEvidence,
-  useVerifyEvidence,
-} from "@/hooks/useApi";
+import { useAudit, useEvidence, useGuidance, useParseEvidence, useVerifyEvidence } from "@/hooks/useApi";
 import { api } from "@/api/client";
 import { ColumnMappingPanel } from "@/components/evidence/ColumnMappingPanel";
 import { useToast } from "@/components/ui/Toast";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PageGuide } from "@/components/guidance/PageGuide";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -37,6 +33,7 @@ import type { Evidence } from "@/types";
 
 export function EvidenceVaultPage() {
   const { caseId } = useParams<{ caseId: string }>();
+  const guidanceQuery = useGuidance(caseId);
   const toast = useToast();
   const evidenceQuery = useEvidence(caseId);
   const auditQuery = useAudit(caseId);
@@ -102,6 +99,8 @@ export function EvidenceVaultPage() {
           </Link>
         }
       />
+
+      <PageGuide page="evidence" caseId={caseId ?? ""} guidance={guidanceQuery.data} />
 
       <Card>
         <CardHeader

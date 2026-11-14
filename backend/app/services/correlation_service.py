@@ -5,7 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from ..models import Event, EventEntity, Evidence, GraphEdge, Relationship
-from ..schemas.event import GraphEdgeRead, GraphNodeRead, GraphResponse
+from ..schemas.event import GraphCounts, GraphEdgeRead, GraphNodeRead, GraphResponse
+from .count_service import case_counts
 
 EDGE_LABELS = {
     "evidence_contains_event": "Contains event",
@@ -278,4 +279,26 @@ def build_graph(
                 review_status=data.get("review_status"),
             )
         )
-    return GraphResponse(nodes=nodes, edges=edges)
+
+    # Counts are computed from stored rows, never from the rendered graph, so the
+    # graph page reports the same numbers as the workspace and dashboard.
+    stored = case_counts(db, case_id)
+    node_count = len(nodes)
+    counts = GraphCounts(
+        total_relationships=stored.total_relationships,
+        documented_relationships=stored.documented_relationships,
+        inferred_leads=stored.inferred_leads,
+        unreviewed_relationships=stored.unreviewed_relationships,
+        unique_connections=stored.unique_connections,
+        raw_edges=stored.raw_edges,
+        structural_edges=stored.containment_edges,
+        entities_in_case=stored.entities,
+        entities_with_events=stored.entities_with_events,
+        entity_nodes=sum(1 for node in nodes if node.node_type == "entity"),
+        event_nodes=sum(1 for node in nodes if node.node_type == "event"),
+        evidence_nodes=sum(1 for node in nodes if node.node_type == "evidence"),
+        total_nodes=node_count,
+        total_edges=len(edges),
+        temporal_edges=sum(1 for edge in edges if edge.edge_type == "temporal_proximity"),
+    )
+    return GraphResponse(nodes=nodes, edges=edges, counts=counts)

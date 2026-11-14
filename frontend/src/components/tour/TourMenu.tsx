@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Compass, LifeBuoy, X } from "lucide-react";
 import { TOURS, TOUR_INDEX } from "./tours";
 import { useTour } from "./TourProvider";
@@ -118,12 +119,51 @@ export function WelcomeDialog({ caseId }: { caseId: string | null }) {
 /** Persistent Help entry point listing every tour. */
 export function TourMenu() {
   const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const { start, activeTour } = useTour();
   const { selectedCaseId } = useCaseContext();
+
+  // The top bar uses `backdrop-blur`, which creates a stacking context. A panel
+  // rendered inside it cannot paint above page content, so the menu is portalled
+  // to the document body and positioned from the button's rect. The position is
+  // clamped to the viewport so the menu cannot land off-screen on a narrow
+  // window or after a resize.
+  const placeMenu = useCallback(() => {
+    const element = buttonRef.current;
+    if (!element) return;
+    const rect = element.getBoundingClientRect();
+    const width = Math.min(320, window.innerWidth - 32);
+    const margin = 16;
+    // Align the panel's right edge with the button, then keep it on screen.
+    const right = Math.max(
+      margin,
+      Math.min(window.innerWidth - rect.right, window.innerWidth - width - margin),
+    );
+    setAnchor({ top: rect.bottom + 8, right });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    placeMenu();
+    const onLayout = () => placeMenu();
+    window.addEventListener("resize", onLayout);
+    window.addEventListener("scroll", onLayout, true);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("resize", onLayout);
+      window.removeEventListener("scroll", onLayout, true);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, placeMenu]);
 
   return (
     <div className="relative">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
@@ -139,39 +179,46 @@ export function TourMenu() {
         <span className="hidden sm:inline">Help</span>
       </button>
 
-      {open ? (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            aria-hidden="true"
-            onClick={() => setOpen(false)}
-          />
-          <div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border border-line bg-surface shadow-2xl">
-            <div className="border-b border-line px-3.5 py-2.5">
-              <p className="text-xs font-semibold text-primary">Guided tours</p>
-              <p className="mt-0.5 text-[10px] leading-relaxed text-muted">
-                Each tour walks through real screens and controls.
-              </p>
-            </div>
-            <ul className="max-h-[320px] overflow-auto p-1.5">
-              {TOURS.map((tour) => {
-                const available = TOUR_INDEX.has(tour.id);
-                return (
-                  <li key={tour.id}>
-                    <button
-                      type="button"
-                      disabled={!available}
-                      onClick={() => {
-                        setOpen(false);
-                        start(tour.id, selectedCaseId);
-                      }}
-                      className="w-full rounded-lg px-2.5 py-2 text-left transition hover:bg-surface-2"
-                    >
-                      <span className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-medium text-primary">
-                          {tour.name}
-                        </span>
-                        <span className="font-mono text-[9px] text-muted">
+      {open
+        ? createPortal(
+            <>
+              <div
+                className="fixed inset-0 z-[85]"
+                aria-hidden="true"
+                onClick={() => setOpen(false)}
+              />
+              <div
+                role="menu"
+                aria-label="Guided tours"
+                className="fixed z-[90] max-h-[min(420px,70vh)] w-[min(320px,calc(100vw-2rem))] overflow-auto rounded-xl border border-line bg-surface shadow-2xl"
+                style={{ top: anchor?.top ?? 64, right: anchor?.right ?? 16 }}
+              >
+                <div className="border-b border-line px-3.5 py-2.5">
+                  <p className="text-xs font-semibold text-primary">Guided tours</p>
+                  <p className="mt-0.5 text-[10px] leading-relaxed text-muted">
+                    Each tour walks through real screens and controls.
+                  </p>
+                </div>
+                <ul className="p-1.5">
+                  {TOURS.map((tour) => {
+                    const available = TOUR_INDEX.has(tour.id);
+                    return (
+                      <li key={tour.id}>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={!available}
+                          onClick={() => {
+                            setOpen(false);
+                            start(tour.id, selectedCaseId);
+                          }}
+                          className="w-full rounded-lg px-2.5 py-2 text-left transition hover:bg-surface-2"
+                        >
+                          <span className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-medium text-primary">
+                              {tour.name}
+                            </span>
+                            <span className="font-mono text-[9px] text-muted">
                           {tour.steps.length} steps
                         </span>
                       </span>
@@ -188,9 +235,11 @@ export function TourMenu() {
                 Press Esc or Skip at any time. Navigation is never blocked after a tour.
               </p>
             </div>
-          </div>
-        </>
-      ) : null}
+              </div>
+            </>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

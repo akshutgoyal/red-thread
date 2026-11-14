@@ -20,7 +20,21 @@ def test_guidance_empty_case(client, case):
     body = response.json()
 
     assert body["case_id"] == case["id"]
-    assert len(body["stages"]) == 9
+    assert len(body["stages"]) == 11
+    assert [stage["index"] for stage in body["stages"]] == list(range(1, 12))
+    assert [stage["key"] for stage in body["stages"]] == [
+        "create_case",
+        "upload_evidence",
+        "verify_integrity",
+        "validate_process",
+        "extract_entities",
+        "review_events",
+        "explore_timeline",
+        "understand_relationships",
+        "investigate_patterns",
+        "ai_analysis",
+        "generate_report",
+    ]
     assert body["stages"][0]["status"] == "complete"
     assert body["next_action"]["id"] == "upload_evidence"
     assert body["next_action"]["action_label"] == "Upload evidence"

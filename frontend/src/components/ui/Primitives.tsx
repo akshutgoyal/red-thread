@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Info } from "lucide-react";
 
 export function Tooltip({
@@ -8,12 +8,31 @@ export function Tooltip({
   text: string;
   children: ReactNode;
 }) {
+  // Hover only exists on pointer devices, so the label is also toggled by
+  // clicking or tapping the trigger. Both paths set the same visible state.
+  const [open, setOpen] = useState(false);
+
   return (
     <span className="group relative inline-flex">
-      {children}
+      <span
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setOpen((current) => !current);
+          }
+        }}
+        className="inline-flex"
+      >
+        {children}
+      </span>
       <span
         role="tooltip"
-        className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 w-56 -translate-x-1/2 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] leading-snug text-secondary opacity-0 shadow-card transition group-focus-within:opacity-100 group-hover:opacity-100"
+        className={
+          open
+            ? "pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 w-56 -translate-x-1/2 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] leading-snug text-secondary opacity-100 shadow-card"
+            : "pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 w-56 -translate-x-1/2 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] leading-snug text-secondary opacity-0 shadow-card transition group-focus-within:opacity-100 group-hover:opacity-100"
+        }
       >
         {text}
       </span>
@@ -32,6 +51,16 @@ export function InfoHint({ text }: { text: string }) {
         <Info size={12} />
       </button>
     </Tooltip>
+  );
+}
+
+/** Inline `term` with a one-sentence explanation available on hover or tap. */
+export function TermHelp({ term, text }: { term: string; text: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span>{term}</span>
+      <InfoHint text={text} />
+    </span>
   );
 }
 
