@@ -78,6 +78,41 @@ def test_generate_json_and_pdf_reports(client, case, auth_log_bytes):
     assert any(item["action"] == "report.generated" for item in audit.json())
 
 
+def test_court_report_sections_and_no_fabricated_certificate(client, case, auth_log_bytes):
+    """The court-oriented draft must carry every required section, and must not
+    invent a declaration, signature or certification that it cannot attest to."""
+
+    _prepare_case(client, case, auth_log_bytes)
+    generated = client.post(
+        f"/api/cases/{case['id']}/reports", json={"report_type": "json"}
+    )
+    assert generated.status_code == 201, generated.text
+    report_id = generated.json()["id"]
+
+    download = client.get(
+        f"/api/reports/{report_id}/download", params={"case_id": case["id"]}
+    )
+    payload = download.json()
+
+    # Data sections the court-oriented format requires.
+    assert payload["chain_of_custody"], "chain of custody must be derived from audit rows"
+    assert payload["provenance"]
+    assert payload["provenance"][0]["sha256"] == payload["evidence"][0]["sha256"]
+    assert payload["court_disclaimer"]
+    joined = " ".join(payload["court_disclaimer"]).lower()
+    assert "cannot independently be submitted" in joined
+    assert "does not provide legal certification" in joined
+
+    # Every statement type must be distinguishable.
+    classifications = {item["classification"] for item in payload["relationships"]}
+    assert classifications <= {"observation", "correlation", "inference", "hypothesis"}
+
+    # No fabricated attestation anywhere in the JSON.
+    serialized = str(payload).lower()
+    assert "digitally signed by" not in serialized
+    assert "i hereby certify that this is a true copy" not in serialized
+
+
 def test_report_access_is_case_scoped(client, case, auth_log_bytes):
     _prepare_case(client, case, auth_log_bytes)
     generated = client.post(

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 RelationshipClassification = Literal["observation", "correlation", "inference", "hypothesis"]
 RelationshipReviewStatus = Literal[
@@ -61,6 +61,28 @@ class RelationshipRead(BaseModel):
     support_count: int = 0
     created_at: datetime
     updated_at: datetime
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def detection_method(self) -> str:
+        """How this relationship was found.
+
+        ``deterministic`` when a rule alone established it, and
+        ``deterministic+ml_ranked`` when the lightweight scorer also ran. It is
+        never ``ml`` alone: the scorer cannot create a relationship.
+        """
+
+        assist = self.metadata_json.get("ml_assist") or {}
+        return str(assist.get("detection_method") or "deterministic")
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def match_score(self) -> float | None:
+        """Ranking signal in [0, 1]. Never a probability of guilt or fraud."""
+
+        assist = self.metadata_json.get("ml_assist") or {}
+        score = assist.get("score")
+        return float(score) if isinstance(score, (int, float)) else None
 
 
 class RelationshipDetail(RelationshipRead):

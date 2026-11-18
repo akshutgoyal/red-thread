@@ -11,6 +11,7 @@ from app.models import (
     AiQuery,
     AuditEvent,
     Case,
+    Entity,
     Event,
     Evidence,
     Finding,
@@ -561,6 +562,61 @@ def test_ask_ai_end_to_end_with_valid_and_invalid_citations(db):
     assert result["uncertainties"] == ["The year is inferred."]
     assert db.query(AiQuery).count() == 1
     assert db.query(AuditEvent).filter(AuditEvent.action == "ai.query").count() == 1
+
+
+def test_outbound_prompt_contains_no_raw_identifiers(db):
+    """The external provider must never receive raw personal identifiers."""
+
+    case, evidence, event, finding = create_case_graph(db)
+    db.add(
+        Entity(
+            case_id=case.id,
+            entity_type="username",
+            value_original="root",
+            value_normalized="root",
+        )
+    )
+    db.commit()
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = request.content.decode()
+        return chat_response(
+            json.dumps(
+                {
+                    "answer": "The records share an identifier.",
+                    "citations": [
+                        {"kind": "event", "id": event.id, "source_locator": event.source_locator}
+                    ],
+                    "observed": "IP_01 appears in the log.",
+                    "insufficient_evidence": False,
+                }
+            )
+        )
+
+    settings = settings_for(
+        ai_provider="commandcode",
+        COMMANDCODE_API_KEY="test-key",
+        ai_pseudonymize_pii=True,
+    )
+    result = __import__("asyncio").run(
+        ai_service.ask_ai(
+            db,
+            case.id,
+            "Who used 203.0.113.45 and root?",
+            settings,
+            transport=transport_for(handler),
+        )
+    )
+
+    body = captured["body"]
+    assert "203.0.113.45" not in body, "raw IP reached the provider"
+    assert "root" not in body, "raw username reached the provider"
+    assert "IP_01" in body or "USER_01" in body
+
+    # The mapping never leaves the process.
+    assert result["privacy"]["mapping_included"] is False
+    assert result["privacy"]["pseudonymised"] is True
 
 
 def test_ask_ai_unstructured_response_is_not_fabricated(db):

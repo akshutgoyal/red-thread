@@ -208,6 +208,12 @@ def build_graph(
             correlation_rule=relation.correlation_rule,
             classification=relation.classification,
             review_status=relation.review_status,
+            detection_method=str(
+                (relation.metadata_json or {}).get("ml_assist", {}).get(
+                    "detection_method", "deterministic"
+                )
+            ),
+            match_score=(relation.metadata_json or {}).get("ml_assist", {}).get("score"),
         )
 
     if include_temporal:
@@ -277,6 +283,8 @@ def build_graph(
                 correlation_rule=data.get("correlation_rule"),
                 classification=data.get("classification"),
                 review_status=data.get("review_status"),
+                detection_method=data.get("detection_method"),
+                match_score=data.get("match_score"),
             )
         )
 

@@ -33,6 +33,18 @@ class AiCitationRead(BaseModel):
     warning: str | None = None
 
 
+class AiPrivacyRead(BaseModel):
+    """What happened to the question before it left this server.
+
+    ``mapping_included`` is always ``False``: the token-to-value map stays in
+    process memory and is never serialised into any response.
+    """
+
+    pseudonymised: bool = False
+    token_count: int = 0
+    mapping_included: bool = False
+
+
 class AiAnswerResponse(BaseModel):
     answer: str
     citations: list[AiCitationRead]
@@ -50,6 +62,7 @@ class AiAnswerResponse(BaseModel):
     model: str
     model_label: str
     ai_generated: bool = True
+    privacy: AiPrivacyRead = Field(default_factory=AiPrivacyRead)
     usage: dict[str, Any] = Field(default_factory=dict)
 
 

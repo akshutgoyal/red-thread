@@ -103,6 +103,14 @@ export function RelationshipEvidencePanel({
         <Badge className="border-line bg-surface-2 text-secondary">
           {relationship.support_count} supports
         </Badge>
+        {relationship.detection_method?.includes("ml_ranked") ? (
+          <Badge className="border-line bg-surface-2 text-secondary">
+            ML-ranked lead
+            {typeof relationship.match_score === "number"
+              ? ` · ${relationship.match_score.toFixed(2)}`
+              : ""}
+          </Badge>
+        ) : null}
       </div>
 
       <div className="rounded-xl border border-line bg-surface-2/40 p-3">
@@ -110,6 +118,12 @@ export function RelationshipEvidencePanel({
         <p className="mt-2 font-mono text-[10px] text-muted">
           rule: {relationship.correlation_rule}
         </p>
+        {relationship.detection_method?.includes("ml_ranked") ? (
+          <p className="mt-1 text-[10px] text-muted">
+            The match score is a ranking signal, not a probability of guilt, fraud, identity
+            or causation. The rule established this connection; scoring only ordered it.
+          </p>
+        ) : null}
       </div>
 
       <div>

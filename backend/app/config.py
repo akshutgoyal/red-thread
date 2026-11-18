@@ -79,6 +79,10 @@ class Settings(BaseSettings):
     isoquant_cached_input_cost_per_million: float = 0.005
     isoquant_output_cost_per_million: float = 0.45
     ai_redact_pii: bool = True
+    # Replace real identifiers with stable tokens (PERSON_01, PHONE_01, ...)
+    # before sending anything to an external provider. The mapping never leaves
+    # this process.
+    ai_pseudonymize_pii: bool = True
 
     commandcode_api_key: str | None = Field(default=None, validation_alias="COMMANDCODE_API_KEY")
     commandcode_base_url: str = Field(

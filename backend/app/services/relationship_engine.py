@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 from ..config import get_settings
 from ..models import Event, EventEntity, InvestigatorAnnotation, Relationship
 from ..utils.geo import haversine_meters, parse_coordinates
-from . import relationship_service
+from . import ml_ranker, relationship_service
 
 ENGINE_VERSION = "deterministic_correlation_v1"
 IDENTIFIER_TYPES = {
@@ -87,6 +87,17 @@ def _add(
                 correlation_rule,
             )
         )
+    # Ranking happens here so every rule gets the same treatment. The score is
+    # stored alongside the deterministic metadata; it never changes the type,
+    # classification or confidence the rule determined.
+    score = ml_ranker.rank_relationship(
+        relationship_type,
+        metadata,
+        support_count=len(supports),
+        distinct_evidence_ids={
+            support["evidence_id"] for support in supports if support.get("evidence_id")
+        },
+    )
     relationship_service.upsert_relationship(
         db,
         case_id=case_id,
@@ -99,7 +110,7 @@ def _add(
         explanation=explanation,
         confidence=confidence,
         classification=classification,
-        metadata=metadata,
+        metadata={**metadata, "ml_assist": score.as_metadata()},
         supports=supports,
         commit=False,
     )

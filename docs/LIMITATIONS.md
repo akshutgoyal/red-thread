@@ -40,6 +40,15 @@
 - Every relationship can be reviewed and annotated; accepted review does not convert a lead into
   proof.
 - Shared identifiers are investigative correlations, not proof of common ownership or intent.
+- Relationships are scored by a fixed-weight linear model (`services/ml_ranker.py`) that reads only
+  features the deterministic rule already computed. The score is a **ranking signal in [0, 1]**.
+  It is not a probability of guilt, fraud, identity or causation, and it never creates a
+  relationship or changes its type or classification.
+- The scorer has no training step and no model artefact, so it is fully auditable but also limited:
+  it orders leads, it does not discover new kinds of connection.
+- Pseudonymisation before external AI is pattern- and entity-driven. An identifier present in
+  neither the entity table nor a recognised pattern can survive. Treat it as a strong reduction of
+  exposure, not a guarantee of anonymity.
 
 ## Authentication rules
 
@@ -59,6 +68,8 @@
   still verify this.
 - External AI processing sends selected excerpts to a third party. Use only if authorized and
   consistent with the provider's terms.
+- Identifiers are pseudonymised locally before sending, but this is a reduction of exposure, not a
+  guarantee of anonymity. See `AI_INTEGRATION.md`.
 - Red Thread does not claim that external processing is private or compliant for every dataset.
 - No live provider connection is claimed in the test results unless a real request succeeded.
 
@@ -66,8 +77,14 @@
 
 - Reports are marked **DRAFT — HUMAN REVIEW REQUIRED**.
 - They are not automatically court-admissible.
-- The Section 63 BSA section is a preparation template with blank signature fields.
-- Red Thread does not sign, attest, or fabricate an examiner's signature.
+- The court-oriented format follows the sections and the Section 63 certificate fields described in
+  the Schedule to the Bharatiya Sakshya Adhiniyam, 2023. It is a preparation aid, not a filing.
+- Every declaration, device identifier, signature, place and signing date in the Section 63
+  annexure is left **blank on purpose**. Red Thread cannot attest to a device it never examined.
+- The report cannot independently be submitted as a legally valid report. Review, verification and
+  completion by the appropriate party and expert are required.
+- Red Thread does not sign, attest, or fabricate an examiner's signature, and does not guarantee
+  admissibility.
 - Findings do not establish guilt, fraud, authenticity, or intent.
 - Reports include annotations, review decisions and audit events, but those are human records,
   not independent verification.

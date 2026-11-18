@@ -220,6 +220,10 @@ export interface GraphEdge {
   correlation_rule?: string | null;
   classification?: string | null;
   review_status?: string | null;
+  /** "deterministic", "deterministic+ml_ranked", or "heuristic" for a lead. */
+  detection_method?: string | null;
+  /** Ranking signal in [0, 1]. Never a probability of guilt or fraud. */
+  match_score?: number | null;
   data?: Record<string, unknown>;
 }
 
@@ -351,6 +355,12 @@ export interface AiAnswer {
   model: string;
   model_label: string;
   ai_generated: boolean;
+  /** Pseudonymisation applied before the request left this server. */
+  privacy?: {
+    pseudonymised: boolean;
+    token_count: number;
+    mapping_included: boolean;
+  };
   usage?: Record<string, unknown>;
 }
 
@@ -403,6 +413,10 @@ export interface Relationship {
   review_note: string;
   metadata_json: Record<string, unknown>;
   support_count: number;
+  /** "deterministic" for a rule alone, "deterministic+ml_ranked" when scored too. */
+  detection_method?: string;
+  /** Ranking signal in [0, 1]. Never a probability of guilt or fraud. */
+  match_score?: number | null;
   created_at: string;
   updated_at: string;
 }

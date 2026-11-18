@@ -6,6 +6,7 @@ import {
   Save,
   Send,
   ShieldAlert,
+  ShieldCheck,
   Sparkles,
   Trash2,
 } from "lucide-react";
@@ -398,6 +399,15 @@ TOKENHARBOR_MODEL=deepseek-v4.1-flash:free`}
                     {message.answer?.classification ? (
                       <Badge className="border-line-strong bg-surface-2/70 capitalize text-muted">
                         {message.answer.classification}
+                      </Badge>
+                    ) : null}
+                    {message.answer?.privacy?.pseudonymised ? (
+                      <Badge
+                        className="border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200"
+                        title="Real identifiers were replaced with local tokens before this question left the server. The mapping never reaches the provider."
+                      >
+                        <ShieldCheck size={9} className="mr-1" />
+                        {message.answer.privacy.token_count} identifiers pseudonymised
                       </Badge>
                     ) : null}
                   </div>

@@ -167,6 +167,37 @@ The context closing tag is escaped so evidence text cannot terminate the context
   with the provider's data-handling terms. Red Thread does not claim that external API processing is
   private or compliant for every dataset.
 
+### Local pseudonymisation (default on)
+
+A privacy layer sits between Red Thread and the external provider
+(`RED_THREAD_AI_PSEUDONYMIZE_PII=true`).
+
+1. Before the request leaves the process, every identifier is replaced with a stable
+   token: `PERSON_01`, `PHONE_01`, `EMAIL_01`, `ACCOUNT_01`, `DEVICE_01`, `IP_01`,
+   `UPI_01`, `LOCATION_01`, plus `RECORD_NN` for internal record IDs.
+2. Sources of identifiers, in order: the case `entities` table (authoritative, so even
+   a bare username like `root` is caught), key-based rules (`account`, `phone`,
+   `email`, `name`, ...), then content patterns.
+3. The same value always maps to the same token within a request, so the model can
+   still reason about cross-source identity without seeing the value.
+4. The token-to-value map exists **only in process memory** for the duration of the
+   request. It is never written to the database, included in the prompt, logged, or
+   returned by the API. `privacy.mapping_included` is always `false`.
+5. The model's answer is mapped back **server-side**, so the investigator still reads
+   real identifiers while the provider only ever saw tokens.
+6. A token the request never issued is left untouched rather than mapped, so a model
+   cannot fabricate an identity it was not given.
+7. The token count and the fact that pseudonymisation ran are recorded in the audit
+   trail and returned in `privacy` as counts only.
+
+Citations are validated against real stored records *after* de-pseudonymisation, so
+the existing citation-verification path is unchanged.
+
+Limits worth knowing: pseudonymisation is pattern- and entity-driven, so an identifier
+that appears in neither the entity table nor a recognised pattern can survive.
+References to a token across requests are not linkable, which is intended. For
+deployments that must never send anything externally, use a local provider.
+
 ## Local Isoquant verification
 
 On 2026-11-04, with `ISOQUANT_API_KEY` configured locally and

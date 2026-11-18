@@ -6,6 +6,7 @@ import {
   Clock,
   FileSearch,
   GitBranch,
+  Network,
   PlayCircle,
   RefreshCw,
   ScrollText,
@@ -401,6 +402,50 @@ function OverviewTab({
 
       <Card>
         <CardHeader
+          title="How much does each record prove?"
+          subtitle="Every statement in this workspace carries one of these labels. They are not interchangeable."
+        />
+        <CardBody>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[
+              {
+                label: "Documented",
+                meaning:
+                  "Read directly from a stored record, or matched by an exact rule. Still not proof of identity or guilt.",
+                tone: CONFIDENCE_TONE.documented,
+              },
+              {
+                label: "Supported",
+                meaning: "Backed by a cited source record you can open.",
+                tone: CONFIDENCE_TONE.supported,
+              },
+              {
+                label: "Possible correlation",
+                meaning:
+                  "Records relate in time, place or pattern. This is a lead to check, not a finding.",
+                tone: CONFIDENCE_TONE.correlated,
+              },
+              {
+                label: "Uncertain",
+                meaning:
+                  "The timestamp or the record itself is unreliable. Ordering against it is indicative only.",
+                tone: CONFIDENCE_TONE.uncertain,
+              },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className={`rounded-lg border px-3 py-2 ${item.tone}`}
+              >
+                <p className="text-[11px] font-semibold">{item.label}</p>
+                <p className="mt-0.5 text-[10px] leading-relaxed">{item.meaning}</p>
+              </div>
+            ))}
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader
           title="What happened in this case?"
           subtitle="Ordered from stored records. Every statement links back to the evidence behind it."
           action={
@@ -668,13 +713,15 @@ function SequenceRow({
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
         {event.entities.slice(0, 5).map((entity) => (
-          <span
+          <Link
             key={`${entity.id}-${entity.role}`}
-            className="inline-flex items-center gap-1 rounded-full border border-line bg-surface px-2 py-0.5 text-[10px] text-secondary"
+            to={`/cases/${caseId}/graph?focusType=entity&focusId=${entity.id}`}
+            className="inline-flex items-center gap-1 rounded-full border border-line bg-surface px-2 py-0.5 text-[10px] text-secondary transition-colors hover:border-accent/40 hover:text-accent"
+            title={`${entity.entity_type} — open this entity in the relationship graph`}
           >
             <Users size={9} className="text-muted" />
             {entity.value}
-          </span>
+          </Link>
         ))}
         {event.entities.length > 5 ? (
           <span className="text-[10px] text-muted">
@@ -682,6 +729,30 @@ function SequenceRow({
           </span>
         ) : null}
       </div>
+
+      {event.relationships.length > 0 ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-[10px] uppercase tracking-wide text-muted">
+            Related links
+          </span>
+          {event.relationships.slice(0, 3).map((relationship) => (
+            <Link
+              key={relationship.id}
+              to={`/cases/${caseId}/graph?focusType=relationship&focusId=${relationship.id}`}
+              className="inline-flex items-center gap-1 rounded-full border border-line bg-surface px-2 py-0.5 text-[10px] text-secondary transition-colors hover:border-accent/40 hover:text-accent"
+              title={relationship.explanation}
+            >
+              <Network size={9} className="text-muted" />
+              {humanize(relationship.relationship_type)}
+            </Link>
+          ))}
+          {event.relationships.length > 3 ? (
+            <span className="text-[10px] text-muted">
+              +{event.relationships.length - 3} more
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2">
         <Link

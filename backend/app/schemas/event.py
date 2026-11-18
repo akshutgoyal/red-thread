@@ -80,6 +80,12 @@ class GraphEdgeRead(BaseModel):
     correlation_rule: str | None = None
     classification: str | None = None
     review_status: str | None = None
+    # How the connection was found. "deterministic" for a rule alone,
+    # "deterministic+ml_ranked" when the scorer also ran, "heuristic" for a
+    # temporal lead that is not a stored relationship at all.
+    detection_method: str | None = None
+    # Ranking signal in [0, 1]. Never a probability of guilt or fraud.
+    match_score: float | None = None
 
 
 class GraphCounts(BaseModel):

@@ -50,6 +50,43 @@ DISCLAIMER = (
     "behalf of an investigator."
 )
 
+COURT_DISCLAIMER_POINTS = [
+    "This generated report is a preparation aid. It cannot independently be submitted as a "
+    "legally valid report.",
+    "The actual report and any Section 63 certificate require review, verification and "
+    "completion by the appropriate human party or expert.",
+    "AI-generated findings are suggestions. They must not be treated as established facts.",
+    "Investigators must independently verify evidence, chain-of-custody information, "
+    "technical results and applicable legal requirements.",
+    "Red Thread does not provide legal certification or guarantee admissibility.",
+    "The purpose of this document is to help an investigator prepare and organise the actual "
+    "forensic report. It does not replace the responsible expert or the legal process.",
+]
+
+#: Fields prescribed by the Schedule to the Bharatiya Sakshya Adhiniyam, 2023 for the
+#: Section 63 certificate. Red Thread deliberately leaves every declaration, signature,
+#: place and date-of-signing blank: it cannot attest to facts it did not observe.
+SECTION_63_SOURCE_OPTIONS = [
+    "Computer or storage media",
+    "DVR / CCTV system",
+    "Mobile phone",
+    "Flash drive / USB storage",
+    "CD / DVD",
+    "Server",
+    "Cloud / remote service",
+    "Other (specify)",
+]
+
+SECTION_63_IDENTIFIER_FIELDS = [
+    "Make",
+    "Model",
+    "Colour",
+    "Serial number",
+    "IMEI / UIN / UID",
+    "MAC address",
+    "Cloud ID",
+]
+
 
 def _safe(text: Any) -> str:
     value = str(text if text is not None else "")
@@ -231,6 +268,47 @@ def _load_report_data(db: Session, case: Case) -> dict[str, Any]:
             f"{len(conflict_findings)} conflicting record(s) require human reconciliation."
         )
 
+    undisputed_actions = {
+        "evidence.uploaded",
+        "evidence.parsed",
+        "evidence.parse_failed",
+        "evidence.verified",
+        "evidence.verification_failed",
+        "evidence.mapping_saved",
+    }
+    chain_of_custody: list[dict[str, Any]] = []
+    for item in audit:
+        if item.action not in undisputed_actions:
+            continue
+        chain_of_custody.append(
+            {
+                "id": item.id,
+                "at": item.created_at.isoformat(),
+                "action": item.action,
+                "actor": item.actor,
+                "evidence_id": item.evidence_id,
+                "details": item.details_json or {},
+            }
+        )
+
+    provenance = [
+        {
+            "evidence_id": item.id,
+            "filename": item.original_filename,
+            "media_type": item.media_type,
+            "size_bytes": item.size_bytes,
+            "sha256": item.sha256,
+            "recorded_at": item.uploaded_at.isoformat(),
+            "parser": item.parser_name,
+            "parser_version": item.parser_version,
+            "processing_status": item.processing_status,
+            "chain_of_custody_events": sum(
+                1 for step in chain_of_custody if step["evidence_id"] == item.id
+            ),
+        }
+        for item in evidence
+    ]
+
     return {
         "case": {
             "id": case.id,
@@ -241,6 +319,9 @@ def _load_report_data(db: Session, case: Case) -> dict[str, Any]:
             "created_at": case.created_at.isoformat(),
             "updated_at": case.updated_at.isoformat(),
         },
+        "chain_of_custody": chain_of_custody,
+        "provenance": provenance,
+        "court_disclaimer": COURT_DISCLAIMER_POINTS,
         "evidence": [
             {
                 "id": item.id,
@@ -562,6 +643,9 @@ def _build_pdf(path: Path, data: dict[str, Any]) -> None:
             warning_style,
         )
     )
+    story.append(_paragraph("Court-preparation disclaimer", section_style))
+    for point in data.get("court_disclaimer", COURT_DISCLAIMER_POINTS):
+        story.append(_paragraph(f"- {point}", small_style))
     story.append(Spacer(1, 4))
 
     case_rows = [
@@ -615,6 +699,129 @@ def _build_pdf(path: Path, data: dict[str, Any]) -> None:
             body_style,
         )
     )
+
+    story.append(_paragraph("1b. Evidence source and provenance", section_style))
+    story.append(
+        _paragraph(
+            "The following records how each stored file was captured by the tool and what "
+            "processing it received. It does not, by itself, establish who acquired the "
+            "original device or whether the acquisition was lawful.",
+            body_style,
+        )
+    )
+    provenance_rows: list[list[Any]] = [
+        ["File", "Media type", "Recorded at (UTC)", "Parser", "Custody events"]
+    ]
+    for item in data.get("provenance", []):
+        provenance_rows.append(
+            [
+                _paragraph(item["filename"], small_style),
+                _paragraph(item["media_type"], small_style),
+                _paragraph(item["recorded_at"], small_style),
+                _paragraph(
+                    f"{item['parser'] or '-'} {item['parser_version'] or ''}".strip(),
+                    small_style,
+                ),
+                _paragraph(str(item["chain_of_custody_events"]), small_style),
+            ]
+        )
+    if len(provenance_rows) == 1:
+        provenance_rows.append(["No evidence", "-", "-", "-", "-"])
+    story.append(
+        _table(provenance_rows, [45 * mm, 22 * mm, 38 * mm, 30 * mm, 23 * mm], font_size=6.5)
+    )
+
+    story.append(_paragraph("1c. Chain-of-custody records", section_style))
+    if data.get("chain_of_custody"):
+        story.append(
+            _paragraph(
+                f"{len(data['chain_of_custody'])} recorded handling step(s) from the tool's "
+                "audit trail, in chronological order. These are system-recorded events, not "
+                "a signed manual custody log.",
+                body_style,
+            )
+        )
+        custody_rows: list[list[Any]] = [["Time (UTC)", "Action", "Actor", "Evidence"]]
+        for item in data["chain_of_custody"][:150]:
+            custody_rows.append(
+                [
+                    _paragraph(item["at"], small_style),
+                    _paragraph(item["action"], small_style),
+                    _paragraph(item["actor"] or "-", small_style),
+                    _paragraph(item["evidence_id"] or "-", mono_style),
+                ]
+            )
+        story.append(_table(custody_rows, [38 * mm, 55 * mm, 30 * mm, 55 * mm], font_size=6.5))
+        if len(data["chain_of_custody"]) > 150:
+            story.append(
+                _paragraph(
+                    f"Showing 150 of {len(data['chain_of_custody'])} custodial steps; the "
+                    "complete audit trail is available in the JSON report.",
+                    small_style,
+                )
+            )
+    else:
+        story.append(
+            _paragraph(
+                "No chain-of-custody events were recorded for this case. A manual custody "
+                "log must be supplied by the investigating officer.",
+                body_style,
+            )
+        )
+    story.append(Spacer(1, 8))
+
+    story.append(_paragraph("2. Classification of every statement in this report", section_style))
+    legend_rows = [
+        ["Label", "What it means"],
+        [
+            _paragraph("Verified evidence", small_style),
+            _paragraph(
+                "A stored file whose SHA-256 digest matched at verification. This proves "
+                "the stored bytes are unchanged since intake, not pre-acquisition authenticity.",
+                small_style,
+            ),
+        ],
+        [
+            _paragraph("Direct observation", small_style),
+            _paragraph(
+                "A value the parser read from a stored record. It is not an interpretation.",
+                small_style,
+            ),
+        ],
+        [
+            _paragraph("Deterministic relationship", small_style),
+            _paragraph(
+                "A rule matched records, for example an exact identifier seen in two sources. "
+                "A correlation candidate, not proof the same actor produced both records.",
+                small_style,
+            ),
+        ],
+        [
+            _paragraph("Inferred lead / hypothesis", small_style),
+            _paragraph(
+                "A temporal, spatial or pattern suggestion that requires verification. "
+                "Never establishes identity, causation or guilt.",
+                small_style,
+            ),
+        ],
+        [
+            _paragraph("AI-generated text", small_style),
+            _paragraph(
+                "Model output. It is an interpretation and may be wrong. Every citation must "
+                "be checked against the stored record before use.",
+                small_style,
+            ),
+        ],
+        [
+            _paragraph("Investigator annotation", small_style),
+            _paragraph(
+                "A human note attached to a record. The named author is responsible for it.",
+                small_style,
+            ),
+        ],
+    ]
+    story.append(_table(legend_rows, [40 * mm, 138 * mm], font_size=7))
+    story.append(Spacer(1, 8))
 
     story.append(_paragraph("3. Parsing and extraction summary", section_style))
     parsing_rows: list[list[Any]] = [
@@ -993,40 +1200,134 @@ def _build_pdf(path: Path, data: dict[str, Any]) -> None:
     )
     story.append(Spacer(1, 8))
 
-    story.append(_paragraph("12. Section 63 BSA preparation - DRAFT ONLY", section_style))
+    story.append(_paragraph("12. Section 63 BSA certificate - DRAFT ANNEXURE ONLY", section_style))
     story.append(
         _paragraph(
-            "This is a preparation template, not a signed certificate. It must be reviewed, "
-            "completed and signed by the appropriate authorized person. No signature is "
-            "fabricated or attested by Red Thread.",
+            "UNSIGNED PREPARATION TEMPLATE. This annexure reproduces the fields prescribed in "
+            "the Schedule to the Bharatiya Sakshya Adhiniyam, 2023 so an investigator can "
+            "prepare the certificate. It is not a certificate. Every declaration, identifier, "
+            "signature, place and date below is left blank on purpose: Red Thread cannot attest "
+            "to a device it never examined or to a fact it did not observe. Filling, verifying "
+            "and signing it is the responsibility of the party in charge of the device and of "
+            "the expert, not of this tool.",
             warning_style,
         )
     )
+
+    story.append(_paragraph("Annexure A - Records this certificate would cover", body_style))
+    annexure_rows: list[list[Any]] = [["Evidence ID", "File", "SHA-256 digest", "Algorithm"]]
+    for item in data["evidence"][:40]:
+        annexure_rows.append(
+            [
+                _paragraph(item["id"], mono_style),
+                _paragraph(item["filename"], small_style),
+                _paragraph(item["sha256"], mono_style),
+                _paragraph("SHA-256", small_style),
+            ]
+        )
+    if len(annexure_rows) == 1:
+        annexure_rows.append(["No evidence", "-", "-", "-"])
+    story.append(_table(annexure_rows, [30 * mm, 42 * mm, 92 * mm, 14 * mm], font_size=6.2))
     story.append(
         _paragraph(
-            "Part A - Technical particulars (draft): the case evidence inventory, stored "
-            "SHA-256 digests, parser metadata, tool versions and integrity-verification "
-            "results are recorded in this report. The authorized person must confirm that "
-            "the described electronic record, the manner of its production, and the relevant "
-            "device or process are correctly described.",
-            body_style,
+            "A separate certificate is generally required for each electronic record and at "
+            "each occasion it is submitted. Confirm the applicable requirement with counsel.",
+            small_style,
         )
     )
+    story.append(Spacer(1, 6))
+
+    story.append(_paragraph("PART A - To be completed and signed by the party in charge", body_style))
     story.append(
         _paragraph(
-            "Part B - Signature block (to be completed by the authorized examiner):",
-            body_style,
+            "Solemn affirmation: I, the undersigned, do hereby solemnly affirm and state, to "
+            "the best of my knowledge and belief, the particulars set out below concerning the "
+            "electronic record identified above and the device or process that produced it.",
+            small_style,
         )
     )
-    signature_rows = [
-        ["Name", ""],
-        ["Designation / organization", ""],
-        ["Signature", ""],
-        ["Place", ""],
-        ["Date", ""],
-        ["Remarks", ""],
-    ]
-    story.append(_table(signature_rows, [50 * mm, 128 * mm], header=False, font_size=8))
+    source_options = " / ".join(f"[  ] {option}" for option in SECTION_63_SOURCE_OPTIONS)
+    story.append(_paragraph(f"Source type (tick one): {source_options}", small_style))
+    part_a_rows: list[list[Any]] = [["Field", "To be completed by the party"]]
+    for label in SECTION_63_IDENTIFIER_FIELDS:
+        part_a_rows.append([_paragraph(label, small_style), ""])
+    part_a_rows.extend(
+        [
+            [
+                _paragraph(
+                    "The device was under my lawful control and was regularly used to create, "
+                    "store or process information for activities regularly carried on",
+                    small_style,
+                ),
+                "",
+            ],
+            [
+                _paragraph(
+                    "The device was working properly during the material period, or any fault "
+                    "did not affect the record or its accuracy",
+                    small_style,
+                ),
+                "",
+            ],
+            [
+                _paragraph(
+                    "The device was owned, maintained, managed or operated by the signatory",
+                    small_style,
+                ),
+                "",
+            ],
+            [_paragraph("Hash value of the electronic record", small_style), ""],
+            [_paragraph("Hash algorithm used (SHA-256 recommended)", small_style), ""],
+            [_paragraph("Hash report enclosed (Yes / No)", small_style), ""],
+            [_paragraph("Date (DD/MM/YYYY)", small_style), ""],
+            [_paragraph("Time in IST (24-hour format)", small_style), ""],
+            [_paragraph("Place", small_style), ""],
+            [_paragraph("Name of signatory", small_style), ""],
+            [_paragraph("Designation / organization", small_style), ""],
+            [_paragraph("Signature", small_style), ""],
+        ]
+    )
+    story.append(_table(part_a_rows, [110 * mm, 68 * mm], font_size=6.8))
+    story.append(Spacer(1, 8))
+
+    story.append(_paragraph("PART B - To be completed and signed by the expert", body_style))
+    story.append(
+        _paragraph(
+            "Solemn affirmation: I, the undersigned expert, do hereby solemnly affirm and "
+            "state, to the best of my knowledge and belief, that I have examined the source "
+            "identified below and independently verified the hash value stated for the "
+            "electronic record.",
+            small_style,
+        )
+    )
+    story.append(_paragraph(f"Source type (tick one): {source_options}", small_style))
+    part_b_rows: list[list[Any]] = [["Field", "To be completed by the expert"]]
+    for label in SECTION_63_IDENTIFIER_FIELDS:
+        part_b_rows.append([_paragraph(label, small_style), ""])
+    part_b_rows.extend(
+        [
+            [_paragraph("Hash value independently verified by the expert", small_style), ""],
+            [_paragraph("Hash algorithm used (SHA-256 recommended)", small_style), ""],
+            [_paragraph("Hash report enclosed (Yes / No)", small_style), ""],
+            [_paragraph("Basis of expertise (qualification / training / experience)", small_style), ""],
+            [_paragraph("Tool name and version used for examination", small_style), ""],
+            [_paragraph("Date (DD/MM/YYYY)", small_style), ""],
+            [_paragraph("Time in IST (24-hour format)", small_style), ""],
+            [_paragraph("Place", small_style), ""],
+            [_paragraph("Name of expert", small_style), ""],
+            [_paragraph("Designation / organization", small_style), ""],
+            [_paragraph("Signature", small_style), ""],
+        ]
+    )
+    story.append(_table(part_b_rows, [110 * mm, 68 * mm], font_size=6.8))
+    story.append(
+        _paragraph(
+            "Which persons may sign Part B, and what must accompany the certificate, depend on "
+            "the current position in law. This template records fields only; it does not assert "
+            "that the formalities have been satisfied.",
+            warning_style,
+        )
+    )
 
     def footer(canvas, doc):
         canvas.saveState()
