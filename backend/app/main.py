@@ -69,6 +69,10 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        # The download handler names the file here; without this the browser
+        # cannot read the header on a cross-origin response, so the frontend
+        # would have to guess the filename.
+        expose_headers=["Content-Disposition"],
     )
 
     @application.middleware("http")

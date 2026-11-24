@@ -58,6 +58,24 @@ interface RequestOptions {
   headers?: Record<string, string>;
 }
 
+async function throwForResponse(response: Response): Promise<never> {
+  let detail: unknown = null;
+  let message = `${response.status} ${response.statusText}`;
+  try {
+    const payload = await response.json();
+    detail = payload;
+    if (typeof payload?.detail === "string") message = payload.detail;
+    else if (Array.isArray(payload?.detail)) {
+      message = payload.detail
+        .map((item: { msg?: string }) => item.msg ?? "Validation error")
+        .join("; ");
+    }
+  } catch {
+    // keep the status text
+  }
+  throw new ApiError(response.status, message, detail);
+}
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = { ...(options.headers ?? {}) };
   if (authToken) headers.Authorization = `Bearer ${authToken}`;
@@ -79,26 +97,55 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     credentials: "include",
   });
 
-  if (!response.ok) {
-    let detail: unknown = null;
-    let message = `${response.status} ${response.statusText}`;
-    try {
-      const payload = await response.json();
-      detail = payload;
-      if (typeof payload?.detail === "string") message = payload.detail;
-      else if (Array.isArray(payload?.detail)) {
-        message = payload.detail
-          .map((item: { msg?: string }) => item.msg ?? "Validation error")
-          .join("; ");
-      }
-    } catch {
-      // keep the status text
-    }
-    throw new ApiError(response.status, message, detail);
-  }
-
+  if (!response.ok) await throwForResponse(response);
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
+}
+
+/**
+ * Fetch a binary or text resource through the same authenticated path every
+ * other API call uses, then hand it to the browser as a download.
+ *
+ * Why this exists: a plain `<a href>` to the API is a cross-site navigation. It
+ * only authenticates if the browser agrees to send the third-party session
+ * cookie on that navigation, which modern browsers increasingly block. Using
+ * `fetch` with `credentials: 'include'` is the same mechanism as the rest of
+ * the app, so downloads authenticate identically to every other request.
+ */
+export async function downloadFile(
+  caseId: string,
+  url: string,
+  fallbackName: string,
+): Promise<void> {
+  const headers: Record<string, string> = { "X-Case-ID": caseId };
+  if (authToken) headers.Authorization = `Bearer ${authToken}`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers,
+    cache: "no-store",
+    credentials: "include",
+  });
+  if (!response.ok) await throwForResponse(response);
+
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const match = /filename="?([^";]+)"?/i.exec(disposition);
+  const filename = match?.[1]?.trim() || fallbackName;
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  } finally {
+    // Revoke after the click has been dispatched; revoking synchronously can
+    // cancel the download in some browsers.
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000);
+  }
 }
 
 function query(params: Record<string, string | number | boolean | undefined>): string {
@@ -175,6 +222,17 @@ export const api = {
     ),
   getEvidenceContentUrl: (caseId: string, evidenceId: string) =>
     `${API_BASE}/evidence/${evidenceId}/content${query({ case_id: caseId })}`,
+  /** Authenticated fetch of a stored file, exposed as a revocable blob URL. */
+  getEvidenceContentBlobUrl: async (caseId: string, evidenceId: string) => {
+    const headers: Record<string, string> = { "X-Case-ID": caseId };
+    if (authToken) headers.Authorization = `Bearer ${authToken}`;
+    const response = await fetch(
+      `${API_BASE}/evidence/${evidenceId}/content${query({ case_id: caseId })}`,
+      { headers, cache: "no-store", credentials: "include" },
+    );
+    if (!response.ok) await throwForResponse(response);
+    return URL.createObjectURL(await response.blob());
+  },
 
   listEvents: (
     caseId: string,

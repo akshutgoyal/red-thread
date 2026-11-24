@@ -90,4 +90,52 @@ describe("ReportsPage", () => {
     expect(screen.getByText("Pdf report")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument();
   });
+
+  it("downloads through an authenticated fetch, not a bare cross-site link", async () => {
+    // Regression: the download control used to be `<a href target="_blank">`.
+    // A cross-site navigation does not reliably carry the session cookie, so
+    // the API answered "Authentication required" and no file arrived.
+    const blob = new Blob(["%PDF-1.4"], { type: "application/pdf" });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({
+        "content-disposition": 'attachment; filename="case-1.pdf"',
+      }),
+      blob: async () => blob,
+    });
+    const createObjectURL = vi.fn(() => "blob:report");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL });
+
+    const click = vi.fn();
+    const originalCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      const element = originalCreateElement(tag);
+      if (tag === "a") element.click = click;
+      return element;
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/cases/case-1/reports"]}>
+        <Routes>
+          <Route path="/cases/:caseId/reports" element={<ReportsPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Download" }));
+    await vi.waitFor(() => expect(click).toHaveBeenCalled());
+
+    // The request carried credentials and the case header, and targeted the API.
+    const [, options] = fetchMock.mock.calls[0];
+    expect(options.credentials).toBe("include");
+    expect(options.headers["X-Case-ID"]).toBe("case-1");
+    expect(fetchMock.mock.calls[0][0]).toContain("/reports/report-1/download");
+    expect(createObjectURL).toHaveBeenCalledWith(blob);
+
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
 });

@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useCase, useGuidance, useReports } from "@/hooks/useApi";
 import { useGenerateReport } from "@/hooks/useApi";
-import { api } from "@/api/client";
+import { api, downloadFile } from "@/api/client";
 import { useToast } from "@/components/ui/Toast";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PageGuide } from "@/components/guidance/PageGuide";
@@ -38,6 +38,16 @@ export function ReportsPage() {
       onSuccess: () =>
         toast.push("success", "Report generated", `The ${type.toUpperCase()} report is ready.`),
       onError: (error) => toast.push("error", "Report generation failed", error.message),
+    });
+  }
+
+  function download(report: { id: string; report_type: string; filename: string }) {
+    void downloadFile(
+      caseId!,
+      api.getReportDownloadUrl(caseId!, report.id),
+      report.filename,
+    ).catch((error: Error) => {
+      toast.push("error", "Download failed", error.message);
     });
   }
 
@@ -120,15 +130,14 @@ export function ReportsPage() {
                   <Badge className="border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-200">
                     {humanize(report.status)}
                   </Badge>
-                  <a
-                    href={api.getReportDownloadUrl(caseId, report.id)}
-                    target="_blank"
-                    rel="noreferrer"
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon={<Download size={13} />}
+                    onClick={() => download(report)}
                   >
-                    <Button size="sm" variant="secondary" icon={<Download size={13} />}>
-                      Download
-                    </Button>
-                  </a>
+                    Download
+                  </Button>
                 </div>
               </div>
             ))}

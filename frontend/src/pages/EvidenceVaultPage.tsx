@@ -306,7 +306,25 @@ function EvidenceDetail({
     evidence.media_type === "message/rfc822";
   const isImage = evidence.media_type.startsWith("image/");
   const isPdf = evidence.media_type === "application/pdf";
-  const contentUrl = api.getEvidenceContentUrl(caseId, evidence.id);
+
+  // The stored file is fetched through the authenticated API and exposed as a
+  // blob URL. A direct `<img src>`/`<iframe src>` to the API origin would be a
+  // cross-site request and would not reliably carry the session cookie.
+  const contentQuery = useQuery({
+    queryKey: ["evidence-content", caseId, evidence.id],
+    queryFn: () => api.getEvidenceContentBlobUrl(caseId, evidence.id),
+    enabled: isImage || isPdf,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  useEffect(() => {
+    const url = contentQuery.data;
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [contentQuery.data]);
+
+  const contentUrl = contentQuery.data;
   const textQuery = useQuery({
     queryKey: ["evidence-text", evidence.id],
     queryFn: () => api.getEvidenceText(caseId, evidence.id),
@@ -366,9 +384,16 @@ function EvidenceDetail({
         <Button variant="secondary" icon={<RefreshCcw size={14} />} onClick={onParse}>
           {evidence.processing_status === "parsed" ? "Reparse evidence" : "Parse evidence"}
         </Button>
-        <a href={contentUrl} target="_blank" rel="noreferrer">
-          <Button variant="ghost">Open stored file</Button>
-        </a>
+        <Button
+          variant="ghost"
+          loading={contentQuery.isLoading}
+          onClick={() => {
+            const url = contentQuery.data;
+            if (url) window.open(url, "_blank", "noopener,noreferrer");
+          }}
+        >
+          Open stored file
+        </Button>
       </div>
 
       <div>
@@ -387,13 +412,33 @@ function EvidenceDetail({
               </pre>
             )
           ) : isImage ? (
-            <img src={contentUrl} alt={evidence.original_filename} className="max-h-72 rounded-lg" />
+            contentQuery.isLoading ? (
+              <p className="text-xs text-muted">Loading preview…</p>
+            ) : contentQuery.error ? (
+              <p className="text-xs text-rose-600 dark:text-rose-300">
+                {contentQuery.error.message}
+              </p>
+            ) : contentUrl ? (
+              <img
+                src={contentUrl}
+                alt={evidence.original_filename}
+                className="max-h-72 rounded-lg"
+              />
+            ) : null
           ) : isPdf ? (
-            <iframe
-              src={contentUrl}
-              title={evidence.original_filename}
-              className="h-72 w-full rounded-lg bg-white"
-            />
+            contentQuery.isLoading ? (
+              <p className="text-xs text-muted">Loading preview…</p>
+            ) : contentQuery.error ? (
+              <p className="text-xs text-rose-600 dark:text-rose-300">
+                {contentQuery.error.message}
+              </p>
+            ) : contentUrl ? (
+              <iframe
+                src={contentUrl}
+                title={evidence.original_filename}
+                className="h-72 w-full rounded-lg bg-white"
+              />
+            ) : null
           ) : (
             <p className="text-xs text-muted">
               Preview is not available for this media type. Use “Open stored file”.

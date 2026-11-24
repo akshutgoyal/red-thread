@@ -18,7 +18,7 @@ import {
   YAxis,
 } from "recharts";
 import { useEvents, useFindings } from "@/hooks/useApi";
-import { api } from "@/api/client";
+import { api, downloadFile } from "@/api/client";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
 import { Input, Select } from "@/components/ui/Field";
+import { useToast } from "@/components/ui/Toast";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/Table";
 import { severityLabel, severityStyle } from "@/lib/severity";
 import { formatDateTime, humanize } from "@/lib/format";
@@ -33,6 +34,7 @@ import type { EventRecord, Finding } from "@/types";
 
 export function AuthAnalysisPage() {
   const { caseId } = useParams<{ caseId: string }>();
+  const toast = useToast();
   const eventsQuery = useEvents(caseId, { limit: 1000 });
   const findingsQuery = useFindings(caseId, { category: "authentication" });
   const [search, setSearch] = useState("");
@@ -40,6 +42,17 @@ export function AuthAnalysisPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [timeFilter, setTimeFilter] = useState("all");
   const [selected, setSelected] = useState<EventRecord | null>(null);
+
+  function exportAuth(format: "json" | "csv") {
+    if (!caseId) return;
+    void downloadFile(
+      caseId,
+      api.getAuthExportUrl(caseId, format),
+      `auth-export-${caseId.slice(0, 8)}.${format}`,
+    ).catch((error: Error) => {
+      toast.push("error", "Export failed", error.message);
+    });
+  }
 
   const allEvents = useMemo(() => eventsQuery.data?.items ?? [], [eventsQuery.data]);
   const authEvents = useMemo(
@@ -135,16 +148,20 @@ export function AuthAnalysisPage() {
         description="Deterministic parsing and threshold-based indicators. A suspicious pattern is not proof of compromise."
         actions={
           <>
-            <a href={api.getAuthExportUrl(caseId, "json")} target="_blank" rel="noreferrer">
-              <Button variant="secondary" icon={<Download size={14} />}>
-                Export JSON
-              </Button>
-            </a>
-            <a href={api.getAuthExportUrl(caseId, "csv")} target="_blank" rel="noreferrer">
-              <Button variant="secondary" icon={<Download size={14} />}>
-                Export CSV
-              </Button>
-            </a>
+            <Button
+              variant="secondary"
+              icon={<Download size={14} />}
+              onClick={() => exportAuth("json")}
+            >
+              Export JSON
+            </Button>
+            <Button
+              variant="secondary"
+              icon={<Download size={14} />}
+              onClick={() => exportAuth("csv")}
+            >
+              Export CSV
+            </Button>
           </>
         }
       />
