@@ -141,11 +141,14 @@ issued.
 | Component | Version | Notes |
 |---|---|---|
 | Python | 3.11+ | 3.12 is used by the Docker image |
-| Node.js | 20+ | Vite 7 build |
+| Node.js | 20.19+ or 22.12+ | Required by Vite 7 |
 | npm | 10+ | |
 | Tesseract | optional | Only needed for OCR on images |
 
 Without Tesseract, image uploads still work; the parser records a warning instead of failing.
+
+Every dependency, pinned version and system prerequisite is listed in
+[REQUIREMENTS.md](REQUIREMENTS.md).
 
 ---
 
