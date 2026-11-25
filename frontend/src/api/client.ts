@@ -177,6 +177,13 @@ export const api = {
     caseId: string,
     payload: Partial<Pick<CaseSummary, "title" | "description" | "status" | "investigator_notes">>,
   ) => request<CaseSummary>(`/cases/${caseId}`, { method: "PATCH", body: payload }),
+  deleteCase: (caseId: string) =>
+    request<{
+      deleted: boolean;
+      case_id: string;
+      title: string;
+      removed: Record<string, number>;
+    }>(`/cases/${caseId}`, { method: "DELETE", caseId }),
 
   listEvidence: (caseId: string) =>
     request<Evidence[]>(`/cases/${caseId}/evidence`, { caseId }),

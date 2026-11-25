@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FolderOpen, Plus, ShieldCheck, Sparkles } from "lucide-react";
+import { FolderOpen, Plus, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
 import { useCaseContext } from "@/context/CaseContext";
 import { useAuth } from "@/context/AuthContext";
-import { useCreateCase } from "@/hooks/useApi";
+import { useCreateCase, useDeleteCase } from "@/hooks/useApi";
 import { useToast } from "@/components/ui/Toast";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -20,10 +20,31 @@ export function CasesPage() {
   const { cases, isLoading, error, selectedCaseId, setSelectedCaseId } = useCaseContext();
   const { loginDemo } = useAuth();
   const createCase = useCreateCase();
+  const deleteCase = useDeleteCase();
   const [open, setOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [notes, setNotes] = useState("");
+
+  function confirmDelete() {
+    if (!pendingDelete) return;
+    const target = pendingDelete;
+    deleteCase.mutate(target.id, {
+      onSuccess: (result) => {
+        toast.push(
+          "success",
+          "Case deleted",
+          `${result.title} and ${result.removed.evidence ?? 0} evidence file(s) were removed.`,
+        );
+        if (selectedCaseId === target.id) setSelectedCaseId(null);
+        setPendingDelete(null);
+      },
+      onError: (mutationError) => {
+        toast.push("error", "Could not delete case", mutationError.message);
+      },
+    });
+  }
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -125,6 +146,12 @@ export function CasesPage() {
                 >
                   {item.id === selectedCaseId ? "Active case" : "Open case"}
                 </Button>
+                <Button
+                  variant="ghost"
+                  icon={<Trash2 size={14} />}
+                  aria-label={`Delete ${item.title}`}
+                  onClick={() => setPendingDelete({ id: item.id, title: item.title })}
+                />
               </div>
             </CardBody>
           </Card>
@@ -175,6 +202,39 @@ export function CasesPage() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        title="Delete this case?"
+        description="This cannot be undone."
+      >
+        <div className="space-y-4">
+          <div className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs leading-relaxed text-rose-800 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+            <strong>{pendingDelete?.title}</strong> and everything derived from it will be
+            permanently removed: evidence files, extracted events, entities, findings, review
+            decisions, annotations, AI queries, relationships and generated reports.
+          </div>
+          <p className="text-xs text-muted">
+            The stored evidence files are deleted from the storage backend as well, so this case
+            cannot be restored afterwards.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => setPendingDelete(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              icon={<Trash2 size={14} />}
+              loading={deleteCase.isPending}
+              onClick={confirmDelete}
+            >
+              Delete permanently
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

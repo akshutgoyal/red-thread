@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -8,6 +8,7 @@ from ..services.auth_service import AuthPrincipal, get_principal
 from ..dependencies import get_case_or_404
 from ..schemas.case import CaseCreate, CaseRead, CaseSummary, CaseUpdate
 from ..services import audit_service, case_service
+from ..services.demo_seed_service import DEMO_TEMPLATE_TITLES
 
 router = APIRouter(prefix="/cases", tags=["cases"])
 
@@ -49,6 +50,37 @@ def list_cases(
     else:
         cases = case_service.list_cases(db, owner_id=principal.user_id)
     return [case_service.summarize_case(db, case) for case in cases]
+
+
+@router.delete("/{case_id}", status_code=status.HTTP_200_OK)
+def delete_case(
+    case_id: str,
+    db: Session = Depends(get_db),
+    principal: AuthPrincipal | None = Depends(get_principal),
+) -> dict[str, object]:
+    """Permanently delete a case and everything derived from it.
+
+    The shared synthetic demo templates are protected: they are re-created by the
+    startup seed, and deleting one only makes the demo inconsistent until the next
+    restart. Cases created *inside* a demo session are deletable, which is what
+    lets a visitor clean up their own working case.
+    """
+
+    case = get_case_or_404(db, case_id)
+    if case.is_demo and case.title in DEMO_TEMPLATE_TITLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The shared demo cases cannot be deleted.",
+        )
+    if principal is not None and not principal.is_demo and case.owner_id != principal.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this case.",
+        )
+
+    title = case.title
+    removed = case_service.delete_case(db, case)
+    return {"deleted": True, "case_id": case_id, "title": title, "removed": removed}
 
 
 @router.get("/{case_id}", response_model=CaseSummary)

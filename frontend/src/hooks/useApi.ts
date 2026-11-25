@@ -248,6 +248,16 @@ export function useCreateCase() {
   });
 }
 
+export function useDeleteCase() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (caseId: string) => api.deleteCase(caseId),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: queryKeys.cases });
+    },
+  });
+}
+
 export function useUpdateCase(caseId: string) {
   const invalidate = useCaseInvalidation(caseId);
   return useMutation({

@@ -45,6 +45,8 @@ DEMO_CASES: list[dict[str, str]] = [
     },
 ]
 
+DEMO_TEMPLATE_TITLES = frozenset(spec["title"] for spec in DEMO_CASES)
+
 EVIDENCE_SUFFIXES = {
     ".csv",
     ".json",
