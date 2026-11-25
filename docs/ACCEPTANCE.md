@@ -1,8 +1,14 @@
 # PS3 live acceptance record
 
-Date: 2026-11-04  
-Frontend: <https://red-thread-virid.vercel.app>  
+Date: 2026-11-04 (corrections applied 2026-11-25)
+Frontend: <https://red-thread-virid.vercel.app>
 API: <https://red-thread-api.onrender.com/api>
+
+> **Historical record.** This documents a specific verification run on the date above, not the
+> current state of the system. Figures that have since changed are marked with their current
+> value so the record stays useful without contradicting the live product. For current
+> documentation see [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md) and the
+> [README](../README.md).
 
 ## Deployment
 
@@ -45,8 +51,11 @@ identifiers, 4 communication sequences, 2 device/auth contexts and 3 spatial pro
 
 ## Local verification
 
-- Backend: `97 passed` with `pytest -q`.
-- Frontend: `npm run lint` and `npm run build` pass.
+Figures below are from the 2026-11-04 run. Current values are given in brackets where they have
+since changed; the suite has grown considerably since this record.
+
+- Backend: `97 passed` at the time of this run (now **190 passed**).
+- Frontend: `npm run lint` and `npm run build` pass (frontend tests now also exist: **54 passed**).
 - Digital Trail end-to-end test covers multi-source ingestion, provenance, spatial data,
   relationship review, annotation, report JSON and support rows.
 - Synthetic generator produces the seven Digital Trail files and updates
@@ -54,20 +63,25 @@ identifiers, 4 communication sequences, 2 device/auth contexts and 3 spatial pro
 
 ## Caveats
 
-- The deployed demo is public and has no authentication.
+- Authentication: at the time of this run the deployed demo was public with no access gate.
+  **This has changed.** Authentication is now required by default
+  (`RED_THREAD_AUTH_REQUIRED=true`), with Google sign-in and a one-click demo session. The
+  superseded text is retained here only as a record of the earlier state.
 - Reports are draft-only and not automatically court-admissible.
 - Spatial and temporal links are investigative leads, not proof.
 - AI output remains an interpretation requiring human verification.
-- `npm audit` reports 16 dependency findings; they require a separately reviewed upgrade.
+- `npm audit` reported 16 dependency findings at this date; they required a separately reviewed
+  upgrade.
 
 ## Guided investigation experience (local verification)
 
 Verified against the three synthetic demo cases with local SQLite and the live demo seed:
 
-- **Guidance endpoint** (`GET /api/cases/{id}/guidance`) returns nine stages whose status is
-  derived from stored rows. On Operation Digital Trail it reported 7 evidence / 7 parsed /
-  0 needing attention / 20 events / 34 entities / 7 open findings / 202 unreviewed
-  relationships, with next action "202 relationships have not been reviewed".
+- **Guidance endpoint** (`GET /api/cases/{id}/guidance`) returns stages whose status is
+  derived from stored rows. It returned nine stages at this date (now **eleven**, after the
+  integrity and entities stages were added). On Operation Digital Trail it reported 7 evidence /
+  7 parsed / 0 needing attention / 20 events / 34 entities (now **38**) / 7 open findings /
+  202 unreviewed relationships, with next action "202 relationships have not been reviewed".
 - **Event review** persisted a decision, wrote an `event.reviewed` audit row, and updated the
   timeline `event_meta.review_status` plus the guidance counter (1 of 20 reviewed).
 - **Narrative** produced 18 evidence-linked statements in chronological order with no
@@ -87,5 +101,5 @@ Verified against the three synthetic demo cases with local SQLite and the live d
   keys (`classification`, `observed`, `supporting_evidence`, `why_it_matters`,
   `confidence_limitations`, `recommended_next_action`).
 
-Automated checks: 142 backend tests and 23 frontend tests pass; frontend lint and production
-build are clean.
+Automated checks at the end of this run: 142 backend tests and 23 frontend tests passed; frontend
+lint and production build were clean. Current suite: **190 backend and 54 frontend tests**.
