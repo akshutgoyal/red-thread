@@ -774,6 +774,7 @@ red-thread/
 
 ## Documentation
 
+- [Project documentation](docs/PROJECT_DOCUMENTATION.md) - problem statement, objectives, architecture, methodology, implementation, results, future scope
 - [Architecture](docs/ARCHITECTURE.md)
 - [AI integration and privacy](docs/AI_INTEGRATION.md)
 - [Authentication parser](docs/AUTH_PARSER.md)
@@ -781,6 +782,7 @@ red-thread/
 - [Operation Digital Trail](docs/OPERATION_DIGITAL_TRAIL.md)
 - [Limitations and caveats](docs/LIMITATIONS.md)
 - [Windows troubleshooting](docs/WINDOWS.md)
+- [Requirements](REQUIREMENTS.md) - dependencies and software prerequisites
 
 ---
 
