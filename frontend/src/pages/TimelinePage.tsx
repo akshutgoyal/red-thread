@@ -195,7 +195,10 @@ export function TimelinePage({ embedded = false }: { embedded?: boolean } = {}) 
               aria-label="Search events"
             />
           </div>
-          <div data-tour="timeline-filters" className="contents">
+          {/* `display: contents` would give this wrapper no box, so the tour
+              could not highlight it. It stays a normal flex container and
+              inherits the parent's gap instead. */}
+          <div data-tour="timeline-filters" className="flex flex-wrap items-center gap-2">
           <Select
             value={categoryFilter}
             onChange={(event) => setCategoryFilter(event.target.value)}
@@ -364,14 +367,23 @@ export function TimelinePage({ embedded = false }: { embedded?: boolean } = {}) 
         </CardBody>
       </Card>
 
-      {undated.length > 0 ? (
-        <Card className="mt-5 border-amber-200 dark:border-amber-500/20" data-tour="timeline-undated">
-          <CardHeader
-            title="Undated or uncertain events"
-            subtitle="Preserved without forcing false chronological precision"
-          />
-          <CardBody className="space-y-2">
-            {undated.map((event) => (
+      {/* Always rendered, even when empty: the guided tour explains this
+          section, and a conditional section would leave that step with no
+          target to highlight. When there are no undated records the card says
+          so, which is itself useful information. */}
+      <Card className="mt-5 border-amber-200 dark:border-amber-500/20" data-tour="timeline-undated">
+        <CardHeader
+          title="Undated or uncertain events"
+          subtitle="Preserved without forcing false chronological precision"
+        />
+        <CardBody className="space-y-2">
+          {undated.length === 0 ? (
+            <p className="text-xs text-muted">
+              Every parsed event has a usable timestamp. Records that cannot be dated
+              confidently appear here instead of being placed at a guessed position.
+            </p>
+          ) : (
+            undated.map((event) => (
               <button
                 type="button"
                 key={event.id}
@@ -390,10 +402,10 @@ export function TimelinePage({ embedded = false }: { embedded?: boolean } = {}) 
                   <ShieldQuestion size={11} /> {humanize(event.timestamp_confidence)}
                 </Badge>
               </button>
-            ))}
-          </CardBody>
-        </Card>
-      ) : null}
+            ))
+          )}
+        </CardBody>
+      </Card>
 
       <EventDrawer
         caseId={caseId}

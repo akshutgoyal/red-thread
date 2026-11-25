@@ -194,4 +194,51 @@ describe("tour definitions", () => {
     expect(ids).toContain("timeline");
     expect(ids).toContain("ai-assistant");
   });
+
+  it("never routes through a legacy path that only redirects", () => {
+    // `/timeline`, `/spatial`, `/findings` and `/workspace` are redirect shims
+    // that immediately forward into the Crime reconstruction tabs. A tour step
+    // that navigates to one of them never actually lands on the page it
+    // describes: the tab is not selected, so its anchors never render.
+    const legacy = ["/timeline", "/spatial", "/findings", "/workspace"];
+    const offenders: string[] = [];
+    for (const tour of TOURS) {
+      for (const step of tour.steps) {
+        if (step.route && legacy.includes(step.route.split("?")[0])) {
+          offenders.push(`${tour.id}: ${step.route}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("selects the right reconstruction tab when a step targets one", () => {
+    // Anchors that only exist inside a specific reconstruction tab must be
+    // paired with that tab in the route, otherwise the tour navigates to the
+    // workspace and the step has nothing to highlight.
+    const tabAnchors: Record<string, string> = {
+      "timeline-view": "timeline",
+      "timeline-filters": "timeline",
+      "timeline-events": "timeline",
+      "timeline-undated": "timeline",
+      "spatial-map": "locations",
+      "findings-list": "findings",
+    };
+    const offenders: string[] = [];
+    for (const tour of TOURS) {
+      for (const step of tour.steps) {
+        const required = step.anchor ? tabAnchors[step.anchor] : undefined;
+        if (!required || !step.route) continue;
+        if (!step.route.startsWith("/reconstruction")) {
+          offenders.push(`${tour.id}/${step.anchor}: not a reconstruction route`);
+          continue;
+        }
+        const tab = new URLSearchParams(step.route.split("?")[1] ?? "").get("tab");
+        if (tab !== required) {
+          offenders.push(`${tour.id}/${step.anchor}: tab=${tab ?? "none"}, expected ${required}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
 });

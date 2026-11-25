@@ -130,7 +130,14 @@ export function TourProvider({
       : caseId
         ? `/cases/${caseId}${step.route}`
         : null;
-    if (target && window.location.pathname !== target) {
+    if (!target) return;
+    // Compare the full URL, not just the path: a step may select a tab via the
+    // query string (e.g. `/reconstruction?tab=timeline`), and comparing pathnames
+    // would treat that as a different location on every render and navigate in a
+    // loop. Navigating again when only the query differs is exactly what is
+    // needed here, so both parts are compared.
+    const current = `${window.location.pathname}${window.location.search}`;
+    if (current !== target) {
       navigate(target);
     }
   }, [activeTour, stepIndex, caseId, navigate]);

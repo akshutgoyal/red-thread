@@ -116,21 +116,21 @@ export const TOURS: TourDefinition[] = [
 
       // ------------------------------------------------------------ timeline
       {
-        route: "/timeline",
+        route: "/reconstruction?tab=timeline",
         anchor: "timeline-view",
         title: "Step 5 — Timeline",
         body: "The timeline orders every dated event across all sources. Chronology is often what turns separate records into a sequence worth investigating.",
       },
       {
-        route: "/timeline",
+        route: "/reconstruction?tab=timeline",
         anchor: "timeline-filters",
         title: "Compare sources",
         body: "Filter by evidence file or date range to compare what different sources recorded at the same time. Filtering happens on the server.",
         hint: "Timestamps carry a confidence value; clock drift between devices is common.",
       },
       {
-        route: "/timeline",
-        anchor: "timeline-events",
+        route: "/reconstruction?tab=timeline",
+        anchor: "timeline-undated",
         title: "Records without a timestamp",
         body: "Event cards state their timestamp confidence. Records with no usable timestamp are listed in a separate section below instead of being forced into a position they cannot be proven to hold.",
       },
@@ -170,7 +170,7 @@ export const TOURS: TourDefinition[] = [
 
       // -------------------------------------------------------------- spatial
       {
-        route: "/spatial",
+        route: "/reconstruction?tab=locations",
         anchor: "spatial-map",
         title: "Step 7 — Where things happened",
         body: "Locations are taken only from recorded evidence such as GPS, cell towers or place labels. Nothing is inferred to fill a gap.",
@@ -194,13 +194,13 @@ export const TOURS: TourDefinition[] = [
 
       // ------------------------------------------------------------ findings
       {
-        route: "/findings",
+        route: "/reconstruction?tab=findings",
         anchor: "findings-list",
         title: "Step 9 — Findings and review",
         body: "A finding is an observation tied to the evidence that supports it. Severity is a triage signal, not a verdict.",
       },
       {
-        route: "/findings",
+        route: "/reconstruction?tab=findings",
         anchor: "findings-list",
         title: "Record a human decision",
         body: "Each finding carries a review status and any annotations. Unresolved questions stay visible so they are not lost in the report.",
@@ -319,26 +319,26 @@ export const TOURS: TourDefinition[] = [
     description: "Chronology, filters and correlated activity.",
     steps: [
       {
-        route: "/timeline",
+        route: "/reconstruction?tab=timeline",
         anchor: "timeline-view",
         title: "Choose a view",
         body: "All events, correlated events, or flagged events. Correlated groups share a documented relationship.",
       },
       {
-        route: "/timeline",
+        route: "/reconstruction?tab=timeline",
         anchor: "timeline-filters",
         title: "Filter by source and time",
         body: "Restrict to one evidence file or a date range. Filtering happens on the server so large cases stay responsive.",
       },
       {
-        route: "/timeline",
+        route: "/reconstruction?tab=timeline",
         anchor: "timeline-events",
         title: "Read the sequence",
         body: "Each card states what was recorded in plain language, with its timestamp confidence and source locator.",
       },
       {
-        route: "/timeline",
-        anchor: "timeline-events",
+        route: "/reconstruction?tab=timeline",
+        anchor: "timeline-undated",
         title: "Undated records stay visible",
         body: "Records without a usable timestamp are listed separately below the dated events instead of being forced into a false position.",
       },
